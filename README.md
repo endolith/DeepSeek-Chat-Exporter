@@ -1,7 +1,3 @@
-你可以根据需求修改README文件，加入关于导出图片功能的描述。以下是修改后的README内容：
-
----
-
 # DeepSeek Chat Exporter (Markdown, PDF & Image)
 
 这是一个用于导出 DeepSeek 聊天记录的油猴脚本，支持将聊天记录导出为 Markdown、PDF 和 图片 格式。脚本会在 DeepSeek 聊天页面右上角添加三个导出按钮，方便用户快速保存聊天内容。
