@@ -48,7 +48,7 @@
 
   function extractThinkingChain(node) {
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
-      return thinkingNode ? `**Thinking chain**\n${thinkingNode.textContent.trim()}` : null;
+      return thinkingNode ? `**思考链**\n${thinkingNode.textContent.trim()}` : null;
   }
 
   function extractFinalAnswer(node) {
@@ -95,7 +95,7 @@
           }
       });
 
-      return `**Final answer**\n${answerContent.trim()}`;
+      return `**正式回答**\n${answerContent.trim()}`;
   }
 
   function getOrderedMessages() {
@@ -108,7 +108,7 @@
 
       for (const node of chatContainer.children) {
           if (isUserMessage(node)) {
-              messages.push(`**User:**\n${node.textContent.trim()}`);
+              messages.push(`**用户：**\n${node.textContent.trim()}`);
           } else if (isAIMessage(node)) {
               let output = '';
               const aiReplyContainer = node.querySelector(`.${config.aiReplyContainer}`);
@@ -180,9 +180,9 @@
                   </style>
               </head>
               <body>
-                  ${fixedMdContent.replace(/\*\*User:**\*\*\n/g, '<h2>User Question</h2><div class="user-question">')
-                      .replace(/\*\*Final answer\*\*\n/g, '</div><h2>AI Answer</h2><div class="ai-answer">')
-                      .replace(/\*\*Thinking chain\*\*\n/g, '</div><h2>Thinking Chain</h2><div class="ai-chain">')
+                  ${fixedMdContent.replace(/\*\*用户：\*\*\n/g, '<h2>User Question</h2><div class="user-question">')
+                      .replace(/\*\*正式回答\*\*\n/g, '</div><h2>AI Answer</h2><div class="ai-answer">')
+                      .replace(/\*\*思考链\*\*\n/g, '</div><h2>Thinking Chain</h2><div class="ai-chain">')
                       .replace(/\n/g, '<br>')
                       .replace(/---/g, '</div><hr>')}
               </body>
