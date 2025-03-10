@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.1
-// @description  导出 DeepSeek 聊天记录为 Markdown、PDF 和 PNG 格式
-// @author       HSyuf/Blueberrycongee
+// @version      1.7.2
+// @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
+// @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
 // @grant        GM_addStyle
 // @grant        GM_download
@@ -17,23 +17,23 @@
   'use strict';
 
   // =====================
-  // 配置
+  // Configuration
   // =====================
   const config = {
-      chatContainerSelector: '.dad65929', // 聊天框容器
-      userClassPrefix: 'fa81',             // 用户消息 class 前缀
-      aiClassPrefix: 'f9bf7997',           // AI消息相关 class 前缀
-      aiReplyContainer: 'edb250b1',        // AI回复的主要容器
-      searchHintSelector: '.a6d716f5.db5991dd', // 搜索/思考时间
-      thinkingChainSelector: '.e1675d8b',  // 思考链
-      finalAnswerSelector: 'div.ds-markdown.ds-markdown--block', // 正式回答
+      chatContainerSelector: '.dad65929', // Chat container
+      userClassPrefix: 'fa81',             // User message class prefix
+      aiClassPrefix: 'f9bf7997',           // AI message related class prefix
+      aiReplyContainer: 'edb250b1',        // Main container for AI replies
+      searchHintSelector: '.a6d716f5.db5991dd', // Search/thinking time
+      thinkingChainSelector: '.e1675d8b',  // Thinking chain
+      finalAnswerSelector: 'div.ds-markdown.ds-markdown--block', // Final answer
       exportFileName: 'DeepSeek_Chat_Export',
   };
 
-  let __exportPNGLock = false;  // 全局锁，防止重复点击
+  let __exportPNGLock = false;  // Global lock to prevent duplicate clicks
 
   // =====================
-  // 工具函数
+  // Tool functions
   // =====================
   function isUserMessage(node) {
       return node.classList.contains(config.userClassPrefix);
@@ -50,7 +50,7 @@
 
   function extractThinkingChain(node) {
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
-      return thinkingNode ? `**思考链**\n${thinkingNode.textContent.trim()}` : null;
+      return thinkingNode ? `**Thinking chain**\n${thinkingNode.textContent.trim()}` : null;
   }
 
   function extractFinalAnswer(node) {
@@ -97,20 +97,20 @@
           }
       });
 
-      return `**正式回答**\n${answerContent.trim()}`;
+      return `**Final answer**\n${answerContent.trim()}`;
   }
 
   function getOrderedMessages() {
       const messages = [];
       const chatContainer = document.querySelector(config.chatContainerSelector);
       if (!chatContainer) {
-          console.error('未找到聊天容器');
+          console.error('Chat container not found');
           return messages;
       }
 
       for (const node of chatContainer.children) {
           if (isUserMessage(node)) {
-              messages.push(`**用户：**\n${node.textContent.trim()}`);
+              messages.push(`**User:**\n${node.textContent.trim()}`);
           } else if (isAIMessage(node)) {
               let output = '';
               const aiReplyContainer = node.querySelector(`.${config.aiReplyContainer}`);
@@ -139,12 +139,12 @@
   }
 
   // =====================
-  // 导出功能
+  // Export functions
   // =====================
   function exportMarkdown() {
       const mdContent = generateMdContent();
       if (!mdContent) {
-          alert("未找到聊天记录！");
+          alert("No chat history found!");
           return;
       }
 
@@ -182,9 +182,9 @@
                   </style>
               </head>
               <body>
-                  ${fixedMdContent.replace(/\*\*用户：\*\*\n/g, '<h2>用户提问</h2><div class="user-question">')
-                      .replace(/\*\*正式回答\*\*\n/g, '</div><h2>AI 回答</h2><div class="ai-answer">')
-                      .replace(/\*\*思考链\*\*\n/g, '</div><h2>思维链</h2><div class="ai-chain">')
+                  ${fixedMdContent.replace(/\*\*User:**\*\*\n/g, '<h2>User Question</h2><div class="user-question">')
+                      .replace(/\*\*Final answer\*\*\n/g, '</div><h2>AI Answer</h2><div class="ai-answer">')
+                      .replace(/\*\*Thinking chain\*\*\n/g, '</div><h2>Thinking Chain</h2><div class="ai-chain">')
                       .replace(/\n/g, '<br>')
                       .replace(/---/g, '</div><hr>')}
               </body>
@@ -198,17 +198,17 @@
   }
 
   function exportPNG() {
-      if (__exportPNGLock) return;  // 如果当前正在导出，跳过
+      if (__exportPNGLock) return;  // Skip if currently exporting
       __exportPNGLock = true;
 
       const chatContainer = document.querySelector(config.chatContainerSelector);
       if (!chatContainer) {
-          alert("未找到聊天容器！");
+          alert("Chat container not found!");
           __exportPNGLock = false;
           return;
       }
 
-      // 创建沙盒容器
+      // Create sandbox container
       const sandbox = document.createElement('iframe');
       sandbox.style.cssText = `
           position: fixed;
@@ -221,7 +221,7 @@
       `;
       document.body.appendChild(sandbox);
 
-      // 深度克隆与样式处理
+      // Deep clone and style processing
       const cloneNode = chatContainer.cloneNode(true);
       cloneNode.style.cssText = `
           width: 800px !important;
@@ -235,22 +235,22 @@
           box-sizing: border-box !important;
       `;
 
-      // 清理干扰元素，排除图标
+      // Clean up interfering elements, exclude icons
       ['button', 'input', '.ds-message-feedback-container', '.eb23581b.dfa60d66'].forEach(selector => {
           cloneNode.querySelectorAll(selector).forEach(el => el.remove());
       });
 
-      // 数学公式修复
+      // Math formula fix
       cloneNode.querySelectorAll('.katex-display').forEach(mathEl => {
           mathEl.style.transform = 'none !important';
           mathEl.style.position = 'relative !important';
       });
 
-      // 注入沙盒
+      // Inject sandbox
       sandbox.contentDocument.body.appendChild(cloneNode);
       sandbox.contentDocument.body.style.background = 'white';
 
-      // 等待资源加载
+      // Wait for resources to load
       const waitReady = () => Promise.all([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 300))]);
 
       waitReady().then(() => {
@@ -273,23 +273,23 @@
               }, 1000);
           }, 'image/png');
       }).catch(err => {
-          console.error('截图失败:', err);
-          alert(`导出失败：${err.message}`);
+          console.error('Screenshot failed:', err);
+          alert(`Export failed: ${err.message}`);
       }).finally(() => {
           __exportPNGLock = false;
       });
   }
 
   // =====================
-  // 创建导出菜单
+  // Create Export Menu
   // =====================
   function createExportMenu() {
       const menu = document.createElement("div");
       menu.className = "ds-exporter-menu";
       menu.innerHTML = `
-          <button class="export-btn" id="md-btn">导出为 Markdown</button>
-          <button class="export-btn" id="pdf-btn">导出为 PDF</button>
-          <button class="export-btn" id="png-btn">导出图片</button>
+          <button class="export-btn" id="md-btn">Export as Markdown</button>
+          <button class="export-btn" id="pdf-btn">Export as PDF</button>
+          <button class="export-btn" id="png-btn">Export as Image</button>
       `;
 
       menu.querySelector("#md-btn").addEventListener("click", exportMarkdown);
@@ -299,7 +299,7 @@
   }
 
   // =====================
-  // 样式
+  // Styles
   // =====================
   GM_addStyle(`
   .ds-exporter-menu {
@@ -316,7 +316,7 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      align-items: flex-start; /* 确保按钮左对齐 */
+      align-items: flex-start; /* Ensure buttons are left-aligned */
   }
 
   .export-btn {
@@ -332,8 +332,8 @@
       overflow: hidden;
       transition: all 0.3s ease;
       cursor: pointer;
-      width: 200px; /* 定义按钮宽度 */
-      margin-bottom: 8px; /* 添加按钮之间的间距 */
+      width: 200px; /* Define button width */
+      margin-bottom: 8px; /* Add spacing between buttons */
   }
 
   .export-btn::before {
@@ -379,7 +379,7 @@
       100% { transform: translate(100%, 100%) rotate(45deg); }
   }
 
-  /* 添加卡通对话框提示 */
+  /* Add cartoon dialog tooltip */
   .ds-exporter-menu::before {
       position: absolute;
       top: -40px;
@@ -395,7 +395,7 @@
       box-shadow: 0 3px 10px rgba(0,0,0,0.1);
   }
 
-  /* 添加漂浮的装饰元素 */
+  /* Add floating decorative elements */
   .ds-exporter-menu::after {
       content: '';
       position: absolute;
@@ -416,7 +416,7 @@
 
 
   // =====================
-  // 初始化
+  // Initialize
   // =====================
   function init() {
       const checkInterval = setInterval(() => {
