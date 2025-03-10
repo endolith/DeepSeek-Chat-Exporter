@@ -19,7 +19,7 @@ This is a Tampermonkey script for exporting DeepSeek chat conversations in Markd
 
 1. Ensure you have a userscript manager installed (like [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/)).
 2. Click the following link to install the script:
-   - [DeepSeek Chat Exporter Script Installation Link](#) (replace `#` with actual script URL)
+   - [DeepSeek Chat Exporter Script Installation Link](https://github.com/endolith/DeepSeek-Chat-Exporter/raw/refs/heads/main/deepseek_chat_exporter.user.js)
 3. After installation, refresh your DeepSeek chat page.
 4. Three export buttons will appear in the top-right corner, indicating successful script installation.
 
