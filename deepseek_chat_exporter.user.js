@@ -9,8 +9,6 @@
 // @grant        GM_download
 // @license      MIT
 // @require      https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
-// @downloadURL https://update.greasyfork.org/scripts/525523/DeepSeek%20Chat%20Exporter%20%28Markdown%20%20PDF%20%20PNG%29.user.js
-// @updateURL https://update.greasyfork.org/scripts/525523/DeepSeek%20Chat%20Exporter%20%28Markdown%20%20PDF%20%20PNG%29.meta.js
 // ==/UserScript==
 
 (function () {
