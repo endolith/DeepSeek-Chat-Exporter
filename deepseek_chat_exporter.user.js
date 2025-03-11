@@ -302,112 +302,59 @@
   GM_addStyle(`
   .ds-exporter-menu {
       position: fixed;
-      top: 20px;
-      right: 20px;
+      top: 10px;
+      right: 10px;
       z-index: 999999;
-      background: rgba(255, 255, 255, 0.95) url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" fill="%23ff9a9e" opacity="0.2"/></svg>');
-      border: 2px solid #ff93ac;
-      border-radius: 15px;
-      box-shadow: 0 4px 20px rgba(255, 65, 108, 0.3);
-      backdrop-filter: blur(8px);
-      padding: 15px;
+      background: #ffffff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 8px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      align-items: flex-start; /* Ensure buttons are left-aligned */
+      gap: 4px;
   }
 
   .export-btn {
-      background: linear-gradient(145deg, #ff7eb3 0%, #ff758c 100%);
-      color: white;
-      border: 2px solid #fff;
-      border-radius: 12px;
-      padding: 12px 24px;
-      font-family: 'Comic Sans MS', cursive;
-      font-size: 16px;
-      text-shadow: 1px 1px 2px rgba(255, 65, 108, 0.5);
-      position: relative;
-      overflow: hidden;
-      transition: all 0.3s ease;
+      background: #f8f9fa;
+      color: #333;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
       cursor: pointer;
-      width: 200px; /* Define button width */
-      margin-bottom: 8px; /* Add spacing between buttons */
-  }
-
-  .export-btn::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: linear-gradient(45deg, transparent 33%, rgba(255,255,255,0.3) 50%, transparent 66%);
-      transform: rotate(45deg);
-      animation: sparkle 3s infinite linear;
+      width: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background-color 0.2s;
   }
 
   .export-btn:hover {
-      transform: scale(1.05) rotate(-2deg);
-      box-shadow: 0 6px 24px rgba(255, 65, 108, 0.4);
-      background: linear-gradient(145deg, #ff6b9d 0%, #ff677e 100%);
+      background: #e9ecef;
   }
 
   .export-btn:active {
-      transform: scale(0.95) rotate(2deg);
+      background: #dee2e6;
   }
 
   #md-btn::after {
       content: '📁';
-      margin-left: 8px;
-      filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));
+      font-size: 14px;
+      margin-left: 6px;
   }
 
   #pdf-btn::after {
       content: '📄';
-      margin-left: 8px;
+      font-size: 14px;
+      margin-left: 6px;
   }
 
   #png-btn::after {
       content: '🖼️';
-      margin-left: 8px;
-  }
-
-  @keyframes sparkle {
-      0% { transform: translate(-100%, -100%) rotate(45deg); }
-      100% { transform: translate(100%, 100%) rotate(45deg); }
-  }
-
-  /* Add cartoon dialog tooltip */
-  .ds-exporter-menu::before {
-      position: absolute;
-      top: -40px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      padding: 8px 16px;
-      border-radius: 10px;
-      border: 2px solid #ff93ac;
-      font-family: 'Comic Sans MS', cursive;
-      color: #ff6b9d;
-      white-space: nowrap;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-  }
-
-  /* Add floating decorative elements */
-  .ds-exporter-menu::after {
-      content: '';
-      position: absolute;
-      width: 30px;
-      height: 30px;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23ff93ac" d="M12,2.5L15.3,8.6L22,9.7L17,14.5L18.5,21L12,17.5L5.5,21L7,14.5L2,9.7L8.7,8.6L12,2.5Z"/></svg>');
-      top: -20px;
-      right: -15px;
-      animation: float 2s ease-in-out infinite;
-  }
-
-  @keyframes float {
-      0%, 100% { transform: translateY(0) rotate(10deg); }
-      50% { transform: translateY(-10px) rotate(-10deg); }
+      font-size: 14px;
+      margin-left: 6px;
   }
 `);
 
