@@ -285,9 +285,9 @@
       const menu = document.createElement("div");
       menu.className = "ds-exporter-menu";
       menu.innerHTML = `
-          <button class="export-btn" id="md-btn">Export as Markdown</button>
-          <button class="export-btn" id="pdf-btn">Export as PDF</button>
-          <button class="export-btn" id="png-btn">Export as Image</button>
+          <button class="export-btn" id="md-btn" title="Export as Markdown">➡️📁</button>
+          <button class="export-btn" id="pdf-btn" title="Export as PDF">➡️📄</button>
+          <button class="export-btn" id="png-btn" title="Export as Image">➡️🖼️</button>
       `;
 
       menu.querySelector("#md-btn").addEventListener("click", exportMarkdown);
@@ -309,10 +309,10 @@
       border: 1px solid #ddd;
       border-radius: 4px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      padding: 8px;
+      padding: 4px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
   }
 
   .export-btn {
@@ -320,15 +320,15 @@
       color: #333;
       border: 1px solid #dee2e6;
       border-radius: 4px;
-      padding: 6px 12px;
+      padding: 4px 8px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 13px;
+      font-size: 14px;
       cursor: pointer;
-      width: auto;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       transition: background-color 0.2s;
+      min-width: 45px;
   }
 
   .export-btn:hover {
@@ -337,24 +337,6 @@
 
   .export-btn:active {
       background: #dee2e6;
-  }
-
-  #md-btn::after {
-      content: '📁';
-      font-size: 14px;
-      margin-left: 6px;
-  }
-
-  #pdf-btn::after {
-      content: '📄';
-      font-size: 14px;
-      margin-left: 6px;
-  }
-
-  #png-btn::after {
-      content: '🖼️';
-      font-size: 14px;
-      margin-left: 6px;
   }
 `);
 
