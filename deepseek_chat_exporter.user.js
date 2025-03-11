@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.2
+// @version      1.7.3
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -303,7 +303,7 @@
   .ds-exporter-menu {
       position: fixed;
       top: 10px;
-      right: 10px;
+      right: 25px;
       z-index: 999999;
       background: #ffffff;
       border: 1px solid #ddd;
