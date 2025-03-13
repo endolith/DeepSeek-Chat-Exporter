@@ -48,7 +48,17 @@
 
   function extractThinkingChain(node) {
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
-      return thinkingNode ? `**思考链**\n${thinkingNode.textContent.trim()}` : null;
+      if (!thinkingNode) return null;
+
+      // Get the text content
+      const content = thinkingNode.textContent.trim();
+
+      // Convert each line to a blockquote
+      const blockquoteContent = content.split('\n')
+          .map(line => `> ${line}`)
+          .join('\n');
+
+      return `### Thought Process\n${blockquoteContent}`;
   }
 
   function extractFinalAnswer(node) {
@@ -95,7 +105,7 @@
           }
       });
 
-      return `**正式回答**\n${answerContent.trim()}`;
+      return answerContent.trim();
   }
 
   function getOrderedMessages() {
@@ -108,7 +118,7 @@
 
       for (const node of chatContainer.children) {
           if (isUserMessage(node)) {
-              messages.push(`**用户：**\n${node.textContent.trim()}`);
+              messages.push(`## User\n\n${node.textContent.trim()}`);
           } else if (isAIMessage(node)) {
               let output = '';
               const aiReplyContainer = node.querySelector(`.${config.aiReplyContainer}`);
@@ -124,7 +134,7 @@
               const finalAnswer = extractFinalAnswer(node);
               if (finalAnswer) output += `${finalAnswer}\n\n`;
               if (output.trim()) {
-                  messages.push(output.trim());
+                  messages.push(`## Assistant\n\n${output.trim()}`);
               }
           }
       }
@@ -163,7 +173,7 @@
       const mdContent = generateMdContent();
       if (!mdContent) return;
 
-      const fixedMdContent = mdContent.replace(/(\*\*.*?\*\*)/g, '<strong>$1</strong>')
+      const fixedMdContent = mdContent
           .replace(/\(\s*([^)]*)\s*\)/g, '\\($1\\)')
           .replace(/\$\$\s*([^$]*)\s*\$\$/g, '$$$1$$');
 
@@ -174,17 +184,20 @@
                   <style>
                       body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: 0 auto; }
                       h2 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
+                      h3 { color: #555; margin-top: 15px; }
                       .ai-answer { color: #1a7f37; margin: 15px 0; }
-                      .ai-chain { color: #666; font-style: italic; margin: 10px 0; }
+                      .ai-chain { color: #666; font-style: italic; margin: 10px 0; padding-left: 15px; border-left: 3px solid #ddd; }
                       hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
+                      blockquote { border-left: 3px solid #ddd; margin: 0 0 20px; padding-left: 15px; color: #666; font-style: italic; }
                   </style>
               </head>
               <body>
-                  ${fixedMdContent.replace(/\*\*用户：\*\*\n/g, '<h2>User Question</h2><div class="user-question">')
-                      .replace(/\*\*正式回答\*\*\n/g, '</div><h2>AI Answer</h2><div class="ai-answer">')
-                      .replace(/\*\*思考链\*\*\n/g, '</div><h2>Thinking Chain</h2><div class="ai-chain">')
+                  ${fixedMdContent.replace(/## User\n\n/g, '<h2>User</h2><div class="user-question">')
+                      .replace(/## Assistant\n\n/g, '<h2>Assistant</h2><div class="ai-answer">')
+                      .replace(/### Thought Process\n/g, '<h3>Thought Process</h3><blockquote class="ai-chain">')
+                      .replace(/>\s/g, '') // Remove the blockquote markers for HTML
                       .replace(/\n/g, '<br>')
-                      .replace(/---/g, '</div><hr>')}
+                      .replace(/---/g, '</blockquote></div><hr>')}
               </body>
           </html>
       `;
