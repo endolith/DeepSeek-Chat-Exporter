@@ -9,7 +9,7 @@ This is a Tampermonkey script for exporting DeepSeek chat conversations in Markd
 - **Export to Markdown**: Save chat history as Markdown files, perfect for notes and documentation.
 - **Export to PDF**: Save conversations as PDF files for printing or sharing.
 - **Export to Image**: Capture chat history as image files for easy viewing and sharing.
-- **Automatic Segmentation**: Automatically segments user questions, AI responses, and thought chains for clear readability.
+- **Automatic Segmentation**: Automatically segments user messages, assistant responses, and thought processes for clear readability.
 - **Enhanced Layout**: Optimized formatting for PDF export with customizable styles.
 - **One-Click Operation**: Export with a single click, no complex operations needed.
 
@@ -29,10 +29,10 @@ This is a Tampermonkey script for exporting DeepSeek chat conversations in Markd
 
 1. Open the DeepSeek chat page (`https://chat.deepseek.com/`).
 2. Look for the export buttons in the top-right corner:
-   - **Export to Markdown**: Click to download a `.md` file.
-   - **Export to PDF**: Click to open the print preview window, select "Save as PDF".
-   - **Export to Image**: Click to capture the current chat history as a `.png` image.
-3. Exported files are named with timestamps, e.g., `DeepSeek_Chat_1698765432100.md`, `DeepSeek_Chat_1698765432100.pdf`, or `DeepSeek_Chat_1698765432100.png`.
+   - **➡️📁**: Click to download a `.md` file.
+   - **➡️📄**: Click to open the print preview window, select "Save as PDF".
+   - **➡️🖼️**: Click to capture the current chat history as a `.png` image.
+3. Exported files are named with timestamps, e.g., `DeepSeek_Chat_Export_1698765432100.md`, `DeepSeek_Chat_Export_1698765432100.pdf`, or `DeepSeek_Chat_Export_1698765432100.png`.
 
 ---
 
@@ -40,31 +40,34 @@ This is a Tampermonkey script for exporting DeepSeek chat conversations in Markd
 
 ### Markdown Format
 
-- **User Questions**: Begin with `**User:**`, followed by the message content.
-- **AI Responses**: Begin with `**AI Response:**`, followed by the AI's answer.
-- **AI Thought Chain**: Begin with `**AI Thought Chain:**`, followed by the AI's reasoning process.
+- **User Messages**: Begin with `## User`, followed by the message content.
+- **Assistant Responses**: Begin with `## Assistant`, followed by the response.
+- **Thought Process**: Begin with `### Thought Process`, followed by blockquoted reasoning process.
 - Sections are separated by `---`.
 
 Example:
 
 ```markdown
-**User:**
+## User
+
 Hello, can you help me write some code?
 
 ---
-**AI Thought Chain:**
-This is a request for code writing assistance.
 
----
-**AI Response:**
+## Assistant
+
+### Thought Process
+> This is a request for code writing assistance.
+> Let me help with programming guidance.
+
 Of course! Please tell me what kind of code you need.
 ```
 
 ### PDF Format
 
-- **User Questions**: Displayed with "User Question" heading in normal text.
-- **AI Responses**: Displayed with "AI Response" heading in green text.
-- **Thought Chain**: Displayed with "Thought Chain" heading in gray italic text.
+- **User Messages**: Displayed with "User" heading in normal text.
+- **Assistant Responses**: Displayed with "Assistant" heading in green text.
+- **Thought Process**: Displayed with "Thought Process" heading in gray italic text, with a gray left border.
 - Sections separated by horizontal lines.
 
 ### Image Format
