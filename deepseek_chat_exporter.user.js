@@ -146,7 +146,7 @@
           return;
       }
 
-      const fixedMdContent = mdContent.replace(/(\*\*.*?\*\*)/g, '<strong>$1</strong>')
+      const fixedMdContent = mdContent
           .replace(/\(\s*([^)]*)\s*\)/g, '\\($1\\)')
           .replace(/\$\$\s*([^$]*)\s*\$\$/g, '$$$1$$');
 
