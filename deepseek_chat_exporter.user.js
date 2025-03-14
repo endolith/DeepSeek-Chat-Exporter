@@ -26,6 +26,10 @@
       thinkingChainSelector: '.e1675d8b',  // Thinking chain
       finalAnswerSelector: 'div.ds-markdown.ds-markdown--block', // Final answer
       exportFileName: 'DeepSeek_Chat_Export',
+      // Header strings used in exports
+      userHeader: 'User',
+      assistantHeader: 'Assistant',
+      thoughtsHeader: 'Thought Process',
   };
 
   let __exportPNGLock = false;  // Global lock to prevent duplicate clicks
@@ -58,7 +62,7 @@
           .map(line => `> ${line}`)
           .join('\n');
 
-      return `### Thought Process\n${blockquoteContent}`;
+      return `### ${config.thoughtsHeader}\n${blockquoteContent}`;
   }
 
   function extractFinalAnswer(node) {
@@ -118,7 +122,7 @@
 
       for (const node of chatContainer.children) {
           if (isUserMessage(node)) {
-              messages.push(`## User\n\n${node.textContent.trim()}`);
+              messages.push(`## ${config.userHeader}\n\n${node.textContent.trim()}`);
           } else if (isAIMessage(node)) {
               let output = '';
               const aiReplyContainer = node.querySelector(`.${config.aiReplyContainer}`);
@@ -134,7 +138,7 @@
               const finalAnswer = extractFinalAnswer(node);
               if (finalAnswer) output += `${finalAnswer}\n\n`;
               if (output.trim()) {
-                  messages.push(`## Assistant\n\n${output.trim()}`);
+                  messages.push(`## ${config.assistantHeader}\n\n${output.trim()}`);
               }
           }
       }
@@ -199,9 +203,9 @@
                   </style>
               </head>
               <body>
-                  ${fixedMdContent.replace(/## User\n\n/g, '<h2>User</h2><div class="user-question">')
-                      .replace(/## Assistant\n\n/g, '<h2>Assistant</h2><div class="ai-answer">')
-                      .replace(/### Thought Process\n/g, '<h3>Thought Process</h3><blockquote class="ai-chain">')
+                  ${fixedMdContent.replace(new RegExp(`## ${config.userHeader}\\n\\n`, 'g'), `<h2>${config.userHeader}</h2><div class="user-question">`)
+                      .replace(new RegExp(`## ${config.assistantHeader}\\n\\n`, 'g'), `<h2>${config.assistantHeader}</h2><div class="ai-answer">`)
+                      .replace(new RegExp(`### ${config.thoughtsHeader}\\n`, 'g'), `<h3>${config.thoughtsHeader}</h3><blockquote class="ai-chain">`)
                       .replace(/>\s/g, '') // Remove the blockquote markers for HTML
                       .replace(/\n/g, '<br>')
                       .replace(/---/g, '</blockquote></div><hr>')}
