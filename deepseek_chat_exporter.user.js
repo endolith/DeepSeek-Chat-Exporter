@@ -19,7 +19,7 @@
   // =====================
   const config = {
       chatContainerSelector: '.dad65929', // Chat container
-      userClassPrefix: 'fa81',             // User message class prefix
+      userMessageSelector: '.fa81 > .fbb737a4',  // Direct selector for user message content
       aiClassPrefix: 'f9bf7997',           // AI message related class prefix
       aiReplyContainer: 'edb250b1',        // Main container for AI replies
       searchHintSelector: '.a6d716f5.db5991dd', // Search/thinking time
@@ -38,12 +38,13 @@
   // Tool functions
   // =====================
   /**
-   * Checks if a DOM node represents a user message
+   * Gets the message content if the node contains a user message, null otherwise
    * @param {HTMLElement} node - The DOM node to check
-   * @returns {boolean} True if the node is a user message
+   * @returns {string|null} The user message content if found, null otherwise
    */
-  function isUserMessage(node) {
-      return node.classList.contains(config.userClassPrefix);
+  function getUserMessage(node) {
+      const messageDiv = node.querySelector(config.userMessageSelector);
+      return messageDiv ? messageDiv.firstChild.textContent.trim() : null;
   }
 
   /**
@@ -150,8 +151,9 @@
       }
 
       for (const node of chatContainer.children) {
-          if (isUserMessage(node)) {
-              messages.push(`## ${config.userHeader}\n\n${node.textContent.trim()}`);
+          const userMessage = getUserMessage(node);
+          if (userMessage) {
+              messages.push(`## ${config.userHeader}\n\n${userMessage}`);
           } else if (isAIMessage(node)) {
               let output = '';
               const aiReplyContainer = node.querySelector(`.${config.aiReplyContainer}`);
