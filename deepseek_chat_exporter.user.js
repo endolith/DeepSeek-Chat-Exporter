@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.3
+// @version      1.7.4
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -75,15 +75,18 @@
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
       if (!thinkingNode) return null;
 
-      // Get the text content
-      const content = thinkingNode.textContent.trim();
+      // Get all paragraphs
+      const paragraphs = thinkingNode.querySelectorAll('p.ba94db8a');
+      if (!paragraphs.length) return null;
 
-      // Convert each line to a blockquote
-      const blockquoteContent = content.split('\n')
-          .map(line => `> ${line}`)
-          .join('\n');
+      // Convert each paragraph to blockquotes, filtering out empty ones
+      const blockquotes = Array.from(paragraphs)
+          .map(p => p.textContent.trim())
+          .filter(text => text)  // Remove empty paragraphs
+          .map(text => `> ${text}`)
+          .join('\n>\n');  // Add blockquote marker on blank lines between paragraphs
 
-      return `### ${config.thoughtsHeader}\n${blockquoteContent}`;
+      return `### ${config.thoughtsHeader}\n\n${blockquotes}`;
   }
 
   /**
