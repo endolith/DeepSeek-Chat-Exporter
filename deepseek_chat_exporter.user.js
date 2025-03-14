@@ -75,18 +75,30 @@
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
       if (!thinkingNode) return null;
 
-      // Get all paragraphs
+      // Get all thought paragraphs
       const paragraphs = thinkingNode.querySelectorAll('p.ba94db8a');
-      if (!paragraphs.length) return null;
+      if (!paragraphs.length) {
+          console.debug('No paragraphs found in thinking chain');
+          return null;
+      }
 
-      // Convert each paragraph to blockquotes, filtering out empty ones
-      const blockquotes = Array.from(paragraphs)
-          .map(p => p.textContent.trim())
-          .filter(text => text)  // Remove empty paragraphs
+      // Get React props from paragraphs
+      const thoughts = Array.from(paragraphs)
+          .map(p => {
+              // Get React props
+              const propsKey = Object.keys(p).find(key => key.startsWith('__reactProps$'));
+              if (!propsKey) return null;
+
+              const props = p[propsKey];
+              if (!props?.children?.[0]?.props?.t) return null;
+
+              return props.children[0].props.t.trim();
+          })
+          .filter(text => text) // Remove empty paragraphs
           .map(text => `> ${text}`)
-          .join('\n>\n');  // Add blockquote marker on blank lines between paragraphs
+          .join('\n>\n'); // Add blockquote marker on blank lines between paragraphs
 
-      return `### ${config.thoughtsHeader}\n\n${blockquotes}`;
+      return thoughts ? `### ${config.thoughtsHeader}\n\n${thoughts}` : null;
   }
 
   /**
