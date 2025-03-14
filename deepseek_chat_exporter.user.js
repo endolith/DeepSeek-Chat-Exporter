@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.5
+// @version      1.7.6
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -25,7 +25,8 @@
       searchHintSelector: '.a6d716f5.db5991dd', // Search/thinking time
       thinkingChainSelector: '.e1675d8b',  // Thinking chain
       finalAnswerSelector: 'div.ds-markdown.ds-markdown--block', // Final answer
-      exportFileName: 'DeepSeek_Chat_Export',
+      titleSelector: '.d8ed659a',          // Chat title selector
+      exportFileName: 'DeepSeek',          // Changed from DeepSeek_Chat_Export
       // Header strings used in exports
       userHeader: 'User',
       assistantHeader: 'Assistant',
@@ -172,17 +173,44 @@
   }
 
   /**
+   * Extracts the chat title from the page
+   * @returns {string|null} The chat title if found, null otherwise
+   */
+  function getChatTitle() {
+      const titleElement = document.querySelector(config.titleSelector);
+      return titleElement ? titleElement.textContent.trim() : null;
+  }
+
+  /**
    * Generates the complete markdown content from all messages
    * @returns {string} Complete markdown formatted chat history
    */
   function generateMdContent() {
       const messages = getOrderedMessages();
-      const rawContent = messages.length ? messages.join('\n\n---\n\n') : '';
+      const title = getChatTitle();
+      let content = title ? `# ${title}\n\n` : '';
+      content += messages.length ? messages.join('\n\n---\n\n') : '';
 
       // Convert LaTeX formats to be compatible with Typora and other Markdown renderers
-      return rawContent
+      return content
           .replace(/\\\(\s*(.*?)\s*\\\)/g, '$$$1$$') // Convert \( ... \) to $ ... $
           .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, '$$$$\n$1\n$$$$'); // Convert \[ ... \] to $$ (newline) ... (newline) $$ (newline)
+  }
+
+  /**
+   * Creates a filename-safe version of a string
+   * @param {string} str - The string to make filename-safe
+   * @param {number} maxLength - Maximum length of the resulting string
+   * @returns {string} A filename-safe version of the input string
+   */
+  function makeFilenameSafe(str, maxLength = 50) {
+      if (!str) return '';
+      return str
+          .replace(/[^a-zA-Z0-9-_\s]/g, '') // Remove special characters
+          .replace(/\s+/g, '_')             // Replace spaces with underscores
+          .slice(0, maxLength)              // Truncate to maxLength
+          .replace(/_+$/, '')               // Remove trailing underscores
+          .trim();
   }
 
   /**
@@ -210,11 +238,15 @@
           return;
       }
 
+      const title = getChatTitle();
+      const safeTitle = makeFilenameSafe(title, 30);
+      const titlePart = safeTitle ? `_${safeTitle}` : '';
+
       const blob = new Blob([mdContent], { type: 'text/markdown' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${config.exportFileName}_${getFormattedTimestamp()}.md`;
+      a.download = `${config.exportFileName}${titlePart}_${getFormattedTimestamp()}.md`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
