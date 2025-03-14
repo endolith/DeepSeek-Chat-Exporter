@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.4
+// @version      1.7.5
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -177,7 +177,12 @@
    */
   function generateMdContent() {
       const messages = getOrderedMessages();
-      return messages.length ? messages.join('\n\n---\n\n') : '';
+      const rawContent = messages.length ? messages.join('\n\n---\n\n') : '';
+
+      // Convert LaTeX formats to be compatible with Typora and other Markdown renderers
+      return rawContent
+          .replace(/\\\(\s*(.*?)\s*\\\)/g, '$$$1$$') // Convert \( ... \) to $ ... $
+          .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, '$$$$\n$1\n$$$$'); // Convert \[ ... \] to $$ (newline) ... (newline) $$ (newline)
   }
 
   /**
@@ -205,11 +210,7 @@
           return;
       }
 
-      const fixedMdContent = mdContent
-          .replace(/\(\s*([^)]*)\s*\)/g, '\\($1\\)')
-          .replace(/\$\$\s*([^$]*)\s*\$\$/g, '$$$1$$');
-
-      const blob = new Blob([fixedMdContent], { type: 'text/markdown' });
+      const blob = new Blob([mdContent], { type: 'text/markdown' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -226,10 +227,6 @@
       const mdContent = generateMdContent();
       if (!mdContent) return;
 
-      const fixedMdContent = mdContent
-          .replace(/\(\s*([^)]*)\s*\)/g, '\\($1\\)')
-          .replace(/\$\$\s*([^$]*)\s*\$\$/g, '$$$1$$');
-
       const printContent = `
           <html>
               <head>
@@ -245,7 +242,7 @@
                   </style>
               </head>
               <body>
-                  ${fixedMdContent.replace(new RegExp(`## ${config.userHeader}\\n\\n`, 'g'), `<h2>${config.userHeader}</h2><div class="user-question">`)
+                  ${mdContent.replace(new RegExp(`## ${config.userHeader}\\n\\n`, 'g'), `<h2>${config.userHeader}</h2><div class="user-question">`)
                       .replace(new RegExp(`## ${config.assistantHeader}\\n\\n`, 'g'), `<h2>${config.assistantHeader}</h2><div class="ai-answer">`)
                       .replace(new RegExp(`### ${config.thoughtsHeader}\\n`, 'g'), `<h3>${config.thoughtsHeader}</h3><blockquote class="ai-chain">`)
                       .replace(/>\s/g, '') // Remove the blockquote markers for HTML
