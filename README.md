@@ -32,7 +32,10 @@ This is a Tampermonkey script for exporting DeepSeek chat conversations in Markd
    - **➡️📁**: Click to download a `.md` file.
    - **➡️📄**: Click to open the print preview window, select "Save as PDF".
    - **➡️🖼️**: Click to capture the current chat history as a `.png` image.
-3. Exported files are named with timestamps, e.g., `DeepSeek_Chat_Export_1698765432100.md`, `DeepSeek_Chat_Export_1698765432100.pdf`, or `DeepSeek_Chat_Export_1698765432100.png`.
+3. Exported files are named with timestamps in ISO 8601 format, e.g.:
+   - `DeepSeek_Chat_Export_2024-03-21_15_30_45.md`
+   - `DeepSeek_Chat_Export_2024-03-21_15_30_45.pdf`
+   - `DeepSeek_Chat_Export_2024-03-21_15_30_45.png`
 
 ---
 

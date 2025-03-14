@@ -146,6 +146,13 @@
       return messages.length ? messages.join('\n\n---\n\n') : '';
   }
 
+  function getFormattedTimestamp() {
+      const now = new Date();
+      return now.toISOString()
+          .replace(/[T:]/g, '_')  // Replace T and : with _
+          .replace(/\..+/, '');   // Remove milliseconds and timezone
+  }
+
   // =====================
   // Export functions
   // =====================
@@ -164,7 +171,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${config.exportFileName}_${Date.now()}.md`;
+      a.download = `${config.exportFileName}_${getFormattedTimestamp()}.md`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
@@ -276,7 +283,7 @@
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `${config.exportFileName}_${Date.now()}.png`;
+              a.download = `${config.exportFileName}_${getFormattedTimestamp()}.png`;
               a.click();
               setTimeout(() => {
                   URL.revokeObjectURL(url);
