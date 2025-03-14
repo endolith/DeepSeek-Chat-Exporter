@@ -37,19 +37,39 @@
   // =====================
   // Tool functions
   // =====================
+  /**
+   * Checks if a DOM node represents a user message
+   * @param {HTMLElement} node - The DOM node to check
+   * @returns {boolean} True if the node is a user message
+   */
   function isUserMessage(node) {
       return node.classList.contains(config.userClassPrefix);
   }
 
+  /**
+   * Checks if a DOM node represents an AI message
+   * @param {HTMLElement} node - The DOM node to check
+   * @returns {boolean} True if the node is an AI message
+   */
   function isAIMessage(node) {
       return node.classList.contains(config.aiClassPrefix);
   }
 
+  /**
+   * Extracts search or thinking time information from a node
+   * @param {HTMLElement} node - The DOM node to extract from
+   * @returns {string|null} Markdown formatted search/thinking info or null if not found
+   */
   function extractSearchOrThinking(node) {
       const hintNode = node.querySelector(config.searchHintSelector);
       return hintNode ? `**${hintNode.textContent.trim()}**` : null;
   }
 
+  /**
+   * Extracts and formats the AI's thinking chain as blockquotes
+   * @param {HTMLElement} node - The DOM node containing the thinking chain
+   * @returns {string|null} Markdown formatted thinking chain with header or null if not found
+   */
   function extractThinkingChain(node) {
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
       if (!thinkingNode) return null;
@@ -65,6 +85,11 @@
       return `### ${config.thoughtsHeader}\n${blockquoteContent}`;
   }
 
+  /**
+   * Extracts and formats the final answer content, preserving markdown elements
+   * @param {HTMLElement} node - The DOM node containing the answer
+   * @returns {string|null} Markdown formatted answer content or null if not found
+   */
   function extractFinalAnswer(node) {
       const answerNode = node.querySelector(config.finalAnswerSelector);
       if (!answerNode) return null;
@@ -112,6 +137,10 @@
       return answerContent.trim();
   }
 
+  /**
+   * Collects and formats all messages in the chat in chronological order
+   * @returns {string[]} Array of markdown formatted messages
+   */
   function getOrderedMessages() {
       const messages = [];
       const chatContainer = document.querySelector(config.chatContainerSelector);
@@ -145,11 +174,19 @@
       return messages;
   }
 
+  /**
+   * Generates the complete markdown content from all messages
+   * @returns {string} Complete markdown formatted chat history
+   */
   function generateMdContent() {
       const messages = getOrderedMessages();
       return messages.length ? messages.join('\n\n---\n\n') : '';
   }
 
+  /**
+   * Generates a filename-safe ISO 8601 timestamp
+   * @returns {string} Formatted timestamp YYYY-MM-DD_HH_MM_SS
+   */
   function getFormattedTimestamp() {
       const now = new Date();
       return now.toISOString()
@@ -160,6 +197,10 @@
   // =====================
   // Export functions
   // =====================
+  /**
+   * Exports the chat history as a markdown file
+   * Handles math expressions and creates a downloadable .md file
+   */
   function exportMarkdown() {
       const mdContent = generateMdContent();
       if (!mdContent) {
@@ -180,6 +221,10 @@
       setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
+  /**
+   * Exports the chat history as a PDF
+   * Creates a styled HTML version and opens the browser's print dialog
+   */
   function exportPDF() {
       const mdContent = generateMdContent();
       if (!mdContent) return;
@@ -219,6 +264,10 @@
       setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
   }
 
+  /**
+   * Exports the chat history as a PNG image
+   * Creates a high-resolution screenshot of the chat content
+   */
   function exportPNG() {
       if (__exportPNGLock) return;  // Skip if currently exporting
       __exportPNGLock = true;
@@ -305,6 +354,9 @@
   // =====================
   // Create Export Menu
   // =====================
+  /**
+   * Creates and attaches the export menu buttons to the page
+   */
   function createExportMenu() {
       const menu = document.createElement("div");
       menu.className = "ds-exporter-menu";
@@ -369,6 +421,10 @@
   // =====================
   // Initialize
   // =====================
+  /**
+   * Initializes the exporter by waiting for the chat container to be ready
+   * and then creating the export menu
+   */
   function init() {
       const checkInterval = setInterval(() => {
           if (document.querySelector(config.chatContainerSelector)) {
