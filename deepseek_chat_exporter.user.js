@@ -75,27 +75,26 @@
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
       if (!thinkingNode) return null;
 
-      // Get all thought paragraphs
-      const paragraphs = thinkingNode.querySelectorAll('p.ba94db8a');
-      if (!paragraphs.length) {
-          console.debug('No paragraphs found in thinking chain');
-          return null;
-      }
+      // Process each child node in sequence
+      const thoughts = Array.from(thinkingNode.children)
+          .map(child => {
+              // Handle text paragraphs
+              if (child.classList.contains('ba94db8a')) {
+                  const propsKey = Object.keys(child).find(key => key.startsWith('__reactProps$'));
+                  if (!propsKey || !child[propsKey]?.children?.[0]?.props?.t) return null;
+                  return `> ${child[propsKey].children[0].props.t.trim()}`;
+              }
 
-      // Get React props from paragraphs
-      const thoughts = Array.from(paragraphs)
-          .map(p => {
-              // Get React props
-              const propsKey = Object.keys(p).find(key => key.startsWith('__reactProps$'));
-              if (!propsKey) return null;
+              // Handle KaTeX math blocks
+              if (child.classList.contains('katex-display')) {
+                  const annotation = child.querySelector('annotation[encoding="application/x-tex"]');
+                  if (!annotation) return null;
+                  return `> $$${annotation.textContent}$$`;
+              }
 
-              const props = p[propsKey];
-              if (!props?.children?.[0]?.props?.t) return null;
-
-              return props.children[0].props.t.trim();
+              return null;
           })
-          .filter(text => text) // Remove empty paragraphs
-          .map(text => `> ${text}`)
+          .filter(text => text) // Remove nulls
           .join('\n>\n'); // Add blockquote marker on blank lines between paragraphs
 
       return thoughts ? `### ${config.thoughtsHeader}\n\n${thoughts}` : null;
