@@ -90,55 +90,36 @@
   }
 
   /**
-   * Extracts and formats the final answer content, preserving markdown elements
+   * Extracts the final answer content from React fiber's memoizedProps
    * @param {HTMLElement} node - The DOM node containing the answer
-   * @returns {string|null} Markdown formatted answer content or null if not found
+   * @returns {string|null} Raw markdown content or null if not found
    */
   function extractFinalAnswer(node) {
       const answerNode = node.querySelector(config.finalAnswerSelector);
-      if (!answerNode) return null;
+      if (!answerNode) {
+          console.debug('No answer node found');
+          return null;
+      }
 
-      let answerContent = '';
-      const elements = answerNode.querySelectorAll('.ds-markdown--block p, .ds-markdown--block h3, .katex-display.ds-markdown-math, hr');
+      // Get React fiber
+      const fiberKey = Object.keys(answerNode).find(key => key.startsWith('__reactFiber$'));
+      if (!fiberKey) {
+          console.error('React fiber not found');
+          return null;
+      }
 
-      elements.forEach((element) => {
-          if (element.tagName.toLowerCase() === 'p') {
-              element.childNodes.forEach((childNode) => {
-                  if (childNode.nodeType === Node.TEXT_NODE) {
-                      answerContent += childNode.textContent.trim();
-                  } else if (childNode.classList && childNode.classList.contains('katex')) {
-                      const tex = childNode.querySelector('annotation[encoding="application/x-tex"]');
-                      if (tex) {
-                          answerContent += `$$$${tex.textContent.trim()}$$$`;
-                      }
-                  } else if (childNode.tagName === 'STRONG') {
-                      answerContent += `**${childNode.textContent.trim()}**`;
-                  } else if (childNode.tagName === 'EM') {
-                      answerContent += `*${childNode.textContent.trim()}*`;
-                  } else if (childNode.tagName === 'A') {
-                      const href = childNode.getAttribute('href');
-                      answerContent += `[${childNode.textContent.trim()}](${href})`;
-                  } else if (childNode.nodeType === Node.ELEMENT_NODE) {
-                      answerContent += childNode.textContent.trim();
-                  }
-              });
-              answerContent += '\n\n';
+      const fiber = answerNode[fiberKey];
+      // The Memo component is the first one with memoizedProps containing markdown
+      let current = fiber;
+      while (current) {
+          if (current.memoizedProps?.markdown) {
+              return current.memoizedProps.markdown;
           }
-          else if (element.tagName.toLowerCase() === 'h3') {
-              answerContent += `### ${element.textContent.trim()}\n\n`;
-          }
-          else if (element.classList.contains('katex-display')) {
-              const tex = element.querySelector('annotation[encoding="application/x-tex"]');
-              if (tex) {
-                  answerContent += `$$${tex.textContent.trim()}$$\n\n`;
-              }
-          }
-          else if (element.tagName.toLowerCase() === 'hr') {
-              answerContent += '\n---\n';
-          }
-      });
+          current = current.return;
+      }
 
-      return answerContent.trim();
+      console.error('No markdown found in React fiber');
+      return null;
   }
 
   /**
