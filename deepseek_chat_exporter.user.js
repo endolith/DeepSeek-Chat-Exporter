@@ -76,29 +76,57 @@
       const thinkingNode = node.querySelector(config.thinkingChainSelector);
       if (!thinkingNode) return null;
 
-      // Process each child node in sequence
-      const thoughts = Array.from(thinkingNode.children)
-          .map(child => {
-              // Handle text paragraphs
-              if (child.classList.contains('ba94db8a')) {
-                  const propsKey = Object.keys(child).find(key => key.startsWith('__reactProps$'));
-                  if (!propsKey || !child[propsKey]?.children?.[0]?.props?.t) return null;
-                  return `> ${child[propsKey].children[0].props.t.trim()}`;
+      // Get React fiber
+      const fiberKey = Object.keys(thinkingNode).find(key => key.startsWith('__reactFiber$'));
+      if (!fiberKey) {
+          console.debug('React fiber not found for thinking chain');
+          return null;
+      }
+
+      // Helper function to recursively search the fiber tree
+      function searchFiber(fiber, visited = new Set()) {
+          if (!fiber || visited.has(fiber)) return null;
+          visited.add(fiber);
+
+          // Log component info
+          const componentName = fiber.type?.name || (fiber.elementType?.type?.name) || 'unknown';
+
+          if (fiber.memoizedProps) {
+              // Check for content in various forms
+              if (typeof fiber.memoizedProps.content === 'string' && fiber.memoizedProps.content.trim()) {
+                  console.debug('Found thinking content');
+                  return fiber.memoizedProps.content;
               }
+          }
 
-              // Handle KaTeX math blocks
-              if (child.classList.contains('katex-display')) {
-                  const annotation = child.querySelector('annotation[encoding="application/x-tex"]');
-                  if (!annotation) return null;
-                  return `> $$${annotation.textContent}$$`;
-              }
+          // Search child first (depth-first)
+          if (fiber.child) {
+              const childResult = searchFiber(fiber.child, visited);
+              if (childResult) return childResult;
+          }
 
-              return null;
-          })
-          .filter(text => text) // Remove nulls
-          .join('\n>\n'); // Add blockquote marker on blank lines between paragraphs
+          // Then search sibling
+          if (fiber.sibling) {
+              const siblingResult = searchFiber(fiber.sibling, visited);
+              if (siblingResult) return siblingResult;
+          }
 
-      return thoughts ? `### ${config.thoughtsHeader}\n\n${thoughts}` : null;
+          // Finally search parent
+          if (fiber.return) {
+              const parentResult = searchFiber(fiber.return, visited);
+              if (parentResult) return parentResult;
+          }
+
+          return null;
+      }
+
+      const content = searchFiber(thinkingNode[fiberKey]);
+      if (!content) {
+          console.debug('No thinking content found');
+          return null;
+      }
+
+      return `### ${config.thoughtsHeader}\n\n> ${content.split('\n').join('\n> ')}`;
   }
 
   /**
