@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.6
+// @version      1.7.7
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
 // @grant        GM_addStyle
 // @grant        GM_download
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // @license      MIT
 // @require      https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
 // ==/UserScript==
@@ -32,6 +35,18 @@
       assistantHeader: 'Assistant',
       thoughtsHeader: 'Thought Process',
   };
+
+  // User preferences with defaults
+  const preferences = {
+      convertLatexDelimiters: GM_getValue('convertLatexDelimiters', true),
+  };
+
+  // Register menu command for toggling LaTeX delimiter conversion
+  GM_registerMenuCommand('Toggle LaTeX Delimiter Conversion', () => {
+      preferences.convertLatexDelimiters = !preferences.convertLatexDelimiters;
+      GM_setValue('convertLatexDelimiters', preferences.convertLatexDelimiters);
+      alert(`LaTeX delimiter conversion is now ${preferences.convertLatexDelimiters ? 'enabled' : 'disabled'}`);
+  });
 
   let __exportPNGLock = false;  // Global lock to prevent duplicate clicks
 
@@ -191,10 +206,14 @@
       let content = title ? `# ${title}\n\n` : '';
       content += messages.length ? messages.join('\n\n---\n\n') : '';
 
-      // Convert LaTeX formats to be compatible with Typora and other Markdown renderers
-      return content
-          .replace(/\\\(\s*(.*?)\s*\\\)/g, '$$$1$$') // Convert \( ... \) to $ ... $
-          .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, '$$$$\n$1\n$$$$'); // Convert \[ ... \] to $$ (newline) ... (newline) $$ (newline)
+      // Convert LaTeX formats only if enabled
+      if (preferences.convertLatexDelimiters) {
+          content = content
+              .replace(/\\\(\s*(.*?)\s*\\\)/g, '$$$1$$') // Convert \( ... \) to $ ... $
+              .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, '$$$$\n$1\n$$$$'); // Convert \[ ... \] to $$ (newline) ... (newline) $$ (newline)
+      }
+
+      return content;
   }
 
   /**
@@ -384,18 +403,55 @@
    * Creates and attaches the export menu buttons to the page
    */
   function createExportMenu() {
+      // Create main menu
       const menu = document.createElement("div");
       menu.className = "ds-exporter-menu";
       menu.innerHTML = `
           <button class="export-btn" id="md-btn" title="Export as Markdown">➡️📁</button>
           <button class="export-btn" id="pdf-btn" title="Export as PDF">➡️📄</button>
           <button class="export-btn" id="png-btn" title="Export as Image">➡️🖼️</button>
+          <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
       `;
 
+      // Create settings panel
+      const settingsPanel = document.createElement("div");
+      settingsPanel.className = "ds-settings-panel";
+      settingsPanel.innerHTML = `
+          <div class="ds-settings-row">
+              <label class="switch">
+                  <input type="checkbox" id="latex-toggle" ${preferences.convertLatexDelimiters ? 'checked' : ''}>
+                  <span class="slider"></span>
+              </label>
+              <span>Convert to $ LaTeX Delimiters</span>
+          </div>
+      `;
+
+      // Add event listeners
       menu.querySelector("#md-btn").addEventListener("click", exportMarkdown);
       menu.querySelector("#pdf-btn").addEventListener("click", exportPDF);
       menu.querySelector("#png-btn").addEventListener("click", exportPNG);
+
+      // Settings button toggle
+      menu.querySelector("#settings-btn").addEventListener("click", () => {
+          settingsPanel.classList.toggle("visible");
+      });
+
+      // LaTeX toggle switch
+      settingsPanel.querySelector("#latex-toggle").addEventListener("change", (e) => {
+          preferences.convertLatexDelimiters = e.target.checked;
+          GM_setValue('convertLatexDelimiters', e.target.checked);
+      });
+
+      // Close settings when clicking outside
+      document.addEventListener("click", (e) => {
+          if (!settingsPanel.contains(e.target) &&
+              !menu.querySelector("#settings-btn").contains(e.target)) {
+              settingsPanel.classList.remove("visible");
+          }
+      });
+
       document.body.appendChild(menu);
+      document.body.appendChild(settingsPanel);
   }
 
   // =====================
@@ -440,9 +496,97 @@
   .export-btn:active {
       background: #dee2e6;
   }
+
+  /* Settings panel styles */
+  .ds-settings-panel {
+      position: fixed;
+      top: 10px;
+      right: 95px;
+      z-index: 999998;
+      background: #ffffff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 12px;
+      display: none;
+      color: #333;
+      min-width: 200px;
+  }
+
+  .ds-settings-panel.visible {
+      display: block;
+  }
+
+  .ds-settings-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 0;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      white-space: nowrap;
+  }
+
+  /* Toggle switch styles */
+  .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+  }
+
+  .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+  }
+
+  .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 20px;
+  }
+
+  .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+  }
+
+  input:checked + .slider {
+      background-color: #2196F3;
+  }
+
+  input:checked + .slider:before {
+      transform: translateX(20px);
+  }
+
+  .settings-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      font-size: 16px;
+      color: #666;
+  }
+
+  .settings-btn:hover {
+      color: #333;
+  }
 `);
-
-
 
   // =====================
   // Initialize
