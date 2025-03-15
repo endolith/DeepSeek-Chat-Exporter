@@ -73,32 +73,32 @@
    * @returns {string|null} Markdown formatted thinking chain with header or null if not found
    */
   function extractThinkingChain(node) {
-      const thinkingNode = node.querySelector(config.thinkingChainSelector);
-      if (!thinkingNode) return null;
+      // Get the parent container first - this is the main AI reply container
+      const containerNode = node.closest(`.${config.aiReplyContainer}`);
+      if (!containerNode) {
+          console.debug('Could not find aiReplyContainer parent container');
+          return null;
+      }
 
-      // Process each child node in sequence
-      const thoughts = Array.from(thinkingNode.children)
-          .map(child => {
-              // Handle text paragraphs
-              if (child.classList.contains('ba94db8a')) {
-                  const propsKey = Object.keys(child).find(key => key.startsWith('__reactProps$'));
-                  if (!propsKey || !child[propsKey]?.children?.[0]?.props?.t) return null;
-                  return `> ${child[propsKey].children[0].props.t.trim()}`;
-              }
+      // Get its React fiber - this connects the DOM to React's internal tree
+      const fiberKey = Object.keys(containerNode).find(key => key.startsWith('__reactFiber$'));
+      if (!fiberKey) return null;
 
-              // Handle KaTeX math blocks
-              if (child.classList.contains('katex-display')) {
-                  const annotation = child.querySelector('annotation[encoding="application/x-tex"]');
-                  if (!annotation) return null;
-                  return `> $$${annotation.textContent}$$`;
-              }
+      // Navigate the React fiber tree to find the content:
+      let current = containerNode[fiberKey];                // Start at container div
+      current = current.child;                             // First child: Toggle button component
+      current = current.sibling;                          // Sibling: Content container div
+      current = current.child;                            // First child: Empty div
+      current = current.sibling;                          // Sibling: Anonymous Memo component
+      current = current.child;                            // Child: Component with content prop
 
-              return null;
-          })
-          .filter(text => text) // Remove nulls
-          .join('\n>\n'); // Add blockquote marker on blank lines between paragraphs
+      // Check if we found the content
+      if (!current?.memoizedProps?.content) {
+          console.debug('Could not find markdown content in Memo');
+          return null;
+      }
 
-      return thoughts ? `### ${config.thoughtsHeader}\n\n${thoughts}` : null;
+      return `### ${config.thoughtsHeader}\n\n> ${current.memoizedProps.content.split('\n').join('\n> ')}`;
   }
 
   /**
