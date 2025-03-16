@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.7
+// @version      1.7.8
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -208,9 +208,13 @@
 
       // Convert LaTeX formats only if enabled
       if (preferences.convertLatexDelimiters) {
+          // Use replacement functions to properly handle newlines and whitespace
           content = content
-              .replace(/\\\(\s*(.*?)\s*\\\)/g, '$$$1$$') // Convert \( ... \) to $ ... $
-              .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, '$$$$\n$1\n$$$$'); // Convert \[ ... \] to $$ (newline) ... (newline) $$ (newline)
+              // Inline math: \( ... \) → $ ... $
+              .replace(/\\\(\s*(.*?)\s*\\\)/g, (match, group) => `$${group}$`)
+
+              // Display math: \[ ... \] → $$ ... $$
+              .replace(/\\\[([\s\S]*?)\\\]/g, (match, group) => `$$${group}$$`);
       }
 
       return content;
