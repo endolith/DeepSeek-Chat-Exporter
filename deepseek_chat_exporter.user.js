@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
 // @namespace    http://tampermonkey.net/
-// @version      1.7.8
+// @version      1.8.0
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -136,16 +136,40 @@
       }
 
       const fiber = answerNode[fiberKey];
-      // The Memo component is the first one with memoizedProps containing markdown
       let current = fiber;
-      while (current) {
-          if (current.memoizedProps?.markdown) {
+      let depth = 0;
+      let path = ['start'];
+
+      // Log the initial component
+      console.log('Starting component:', {
+          type: current.type?.toString(),
+          elementType: current.elementType?.toString(),
+          hasMarkdown: !!current.memoizedProps?.markdown,
+          propKeys: Object.keys(current.memoizedProps || {})
+      });
+
+      // Search up the tree and log each step
+      while (current && depth < 10) {
+          current = current.return;
+          depth++;
+          path.push('return');
+
+          // Log each component we check
+          console.log(`Checking component at depth ${depth}:`, {
+              path: path.join(' -> '),
+              type: current?.type?.toString(),
+              elementType: current?.elementType?.toString(),
+              hasMarkdown: !!current?.memoizedProps?.markdown,
+              propKeys: Object.keys(current?.memoizedProps || {})
+          });
+
+          if (current?.memoizedProps?.markdown) {
+              console.log('✅ Found markdown at:', path.join(' -> '));
               return current.memoizedProps.markdown;
           }
-          current = current.return;
       }
 
-      console.error('No markdown found in React fiber');
+      console.error('No markdown found after checking', depth, 'levels');
       return null;
   }
 
