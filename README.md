@@ -1,6 +1,15 @@
 # DeepSeek Chat Exporter (Markdown, PDF & Image)
 
-This is a Tampermonkey script for exporting DeepSeek chat conversations in Markdown, PDF, and image formats. The script adds three export buttons to the top-right corner of the DeepSeek chat interface for quick and easy conversation saving.
+This is a Tampermonkey/Violentmonkey script for exporting DeepSeek chat conversations in Markdown, PDF, and image formats. The script adds three export buttons to the top-right corner of the DeepSeek chat interface for quick and easy conversation saving.
+
+This is an English translation of <https://github.com/blueberrycongee/DeepSeek-Chat-Exporter> with several modifications:
+
+- Extract original markdown for Assistant messages from React instead of incompletely translating from HTML back to markdown.
+- Add a switch for whether to convert LaTeX delimiters to $$ format or not, and fix the conversion to correctly handle cases like LaTex inside lists, nested blockquotes, etc.
+- Remove `<strong>` tags in markdown output, and use User/Assistant headers instead, with reasoning tokens in a quote block, like the website.
+- Make the interface less obtrusive and remove animations, etc.
+- Add chat title to exported files, and to filenames.
+- Use ISO 8601 timestamps for filenames instead of UNIX.
 
 ---
 
@@ -32,10 +41,12 @@ This is a Tampermonkey script for exporting DeepSeek chat conversations in Markd
    - **➡️📁**: Click to download a `.md` file.
    - **➡️📄**: Click to open the print preview window, select "Save as PDF".
    - **➡️🖼️**: Click to capture the current chat history as a `.png` image.
-3. Exported files are named with timestamps in ISO 8601 format, e.g.:
-   - `DeepSeek_Chat_Export_2024-03-21_15_30_45.md`
-   - `DeepSeek_Chat_Export_2024-03-21_15_30_45.pdf`
-   - `DeepSeek_Chat_Export_2024-03-21_15_30_45.png`
+   - **⚙️**: Click to access settings:
+     - **LaTeX Delimiter Conversion**: Toggle between keeping original `\( \)` and `\[ \]` delimiters or converting to `$ $` and `$$ $$` format
+3. Exported files are named with the chat title (if any) and timestamps in ISO 8601 format, e.g.:
+   - `DeepSeek_Chat_Title_2024-03-21_15_30_45.md`
+   - `DeepSeek_Chat_Title_2024-03-21_15_30_45.pdf`
+   - `DeepSeek_Chat_Title_2024-03-21_15_30_45.png`
 
 ---
 
@@ -46,6 +57,7 @@ This is a Tampermonkey script for exporting DeepSeek chat conversations in Markd
 - **User Messages**: Begin with `## User`, followed by the message content.
 - **Assistant Responses**: Begin with `## Assistant`, followed by the response.
 - **Thought Process**: Begin with `### Thought Process`, followed by blockquoted reasoning process.
+- **LaTeX Math**: Either preserved in original `\( \)` and `\[ \]` format, or converted to `$ $` and `$$ $$` format based on settings
 - Sections are separated by `---`.
 
 Example:
@@ -90,7 +102,7 @@ Of course! Please tell me what kind of code you need.
 
 ## Feedback and Contributions
 
-If you encounter issues or have suggestions for improvements, please submit an Issue or Pull Request.
+If you encounter issues or have suggestions for improvements, please submit an Issue or Pull Request at <https://github.com/endolith/DeepSeek-Chat-Exporter>.
 
 ---
 
