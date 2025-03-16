@@ -135,42 +135,18 @@
           return null;
       }
 
-      const fiber = answerNode[fiberKey];
-      let current = fiber;
-      let depth = 0;
-      let path = ['start'];
+      // Navigate directly to the markdown component (2 levels up)
+      const fiber = answerNode[fiberKey];           // Start at div
+      const level1 = fiber.return;                  // First parent
+      const markdownComponent = level1?.return;     // Second parent (has markdown)
 
-      // Log the initial component
-      console.log('Starting component:', {
-          type: current.type?.toString(),
-          elementType: current.elementType?.toString(),
-          hasMarkdown: !!current.memoizedProps?.markdown,
-          propKeys: Object.keys(current.memoizedProps || {})
-      });
-
-      // Search up the tree and log each step
-      while (current && depth < 10) {
-          current = current.return;
-          depth++;
-          path.push('return');
-
-          // Log each component we check
-          console.log(`Checking component at depth ${depth}:`, {
-              path: path.join(' -> '),
-              type: current?.type?.toString(),
-              elementType: current?.elementType?.toString(),
-              hasMarkdown: !!current?.memoizedProps?.markdown,
-              propKeys: Object.keys(current?.memoizedProps || {})
-          });
-
-          if (current?.memoizedProps?.markdown) {
-              console.log('✅ Found markdown at:', path.join(' -> '));
-              return current.memoizedProps.markdown;
-          }
+      // If any navigation step failed or the component doesn't have markdown, return null
+      if (!markdownComponent?.memoizedProps?.markdown) {
+          console.error('Could not find markdown at expected location in React tree');
+          return null;
       }
 
-      console.error('No markdown found after checking', depth, 'levels');
-      return null;
+      return markdownComponent.memoizedProps.markdown;
   }
 
   /**
