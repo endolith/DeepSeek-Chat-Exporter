@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         DeepSeek Chat Exporter (Markdown & PDF & PNG)
+// @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
 // @namespace    http://tampermonkey.net/
 // @version      1.8.0
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
