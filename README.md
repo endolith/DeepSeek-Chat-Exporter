@@ -40,8 +40,8 @@ This is an English translation of <https://github.com/blueberrycongee/DeepSeek-C
 
 1. Open the DeepSeek chat page (`https://chat.deepseek.com/`).
 2. Look for the export buttons in the top-right corner:
-   - **➡️📁**: Click to download a `.md` file.
-   - **➡️📄**: Click to open the print preview window, select "Save as PDF".
+   - **➡️📝**: Click to download a `.md` file.
+   - **➡️🖨**: Click to open the print preview window, select "Save as PDF".
    - **➡️🖼️**: Click to capture the current chat history as a `.png` image.
    - **⚙️**: Click to access settings:
      - **LaTeX Delimiter Conversion**: Toggle between keeping original `\( \)` and `\[ \]` delimiters or converting to `$ $` and `$$ $$` format
