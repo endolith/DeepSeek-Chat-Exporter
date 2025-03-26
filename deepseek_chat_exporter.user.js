@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
 // @namespace    http://tampermonkey.net/
-// @version      1.8.0
+// @version      1.8.1
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -22,10 +22,10 @@
   // =====================
   const config = {
       chatContainerSelector: '.dad65929', // Chat container
-      userMessageSelector: '.fa81 > .fbb737a4',  // Direct selector for user message content
-      aiClassPrefix: 'f9bf7997',           // AI message related class prefix
-      aiReplyContainer: 'edb250b1',        // Main container for AI replies
-      searchHintSelector: '.a6d716f5.db5991dd', // Search/thinking time
+      userMessageSelector: '._9663006 > .fbb737a4',  // Direct selector for user message content
+      aiClassPrefix: '_4f9bf79',           // AI message related class prefix
+      aiReplyContainer: '_43c05b5',        // Main container for AI replies
+      searchHintSelector: '._58a6d71._19db599', // Search/thinking time
       thinkingChainSelector: '.e1675d8b',  // Thinking chain
       finalAnswerSelector: 'div.ds-markdown.ds-markdown--block', // Final answer
       titleSelector: '.d8ed659a',          // Chat title selector
