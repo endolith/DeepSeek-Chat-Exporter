@@ -408,8 +408,8 @@
       const menu = document.createElement("div");
       menu.className = "ds-exporter-menu";
       menu.innerHTML = `
-          <button class="export-btn" id="md-btn" title="Export as Markdown">➡️📁</button>
-          <button class="export-btn" id="pdf-btn" title="Export as PDF">➡️📄</button>
+          <button class="export-btn" id="md-btn" title="Export as Markdown">➡️📝</button>
+          <button class="export-btn" id="pdf-btn" title="Print to PDF">➡️🖨️</button>
           <button class="export-btn" id="png-btn" title="Export as Image">➡️🖼️</button>
           <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
       `;
