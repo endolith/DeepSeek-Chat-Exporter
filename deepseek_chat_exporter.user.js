@@ -88,32 +88,51 @@
    * @returns {string|null} Markdown formatted thinking chain with header or null if not found
    */
   function extractThinkingChain(node) {
-      // Get the parent container first - this is the main AI reply container
-      const containerNode = node.closest(`.${config.aiReplyContainer}`);
-      if (!containerNode) {
-          console.debug('Could not find aiReplyContainer parent container');
-          return null;
-      }
+    console.debug('Start of extractThinkingChain');
 
-      // Get its React fiber - this connects the DOM to React's internal tree
-      const fiberKey = Object.keys(containerNode).find(key => key.startsWith('__reactFiber$'));
-      if (!fiberKey) return null;
+    // Get React fiber directly from the node since it is the container
+    const fiberKey = Object.keys(node).find(key => key.startsWith('__reactFiber$'));
+    if (!fiberKey) {
+        console.debug('No React fiber key found');
+        return null;
+    }
 
-      // Navigate the React fiber tree to find the content:
-      let current = containerNode[fiberKey];                // Start at container div
-      current = current.child;                             // First child: Toggle button component
-      current = current.sibling;                          // Sibling: Content container div
-      current = current.child;                            // First child: Empty div
-      current = current.sibling;                          // Sibling: Anonymous Memo component
-      current = current.child;                            // Child: Component with content prop
+    // Navigate the React fiber tree to find the thoughts content
+    let current = node[fiberKey];
+    console.debug('Initial fiber:', current);
 
-      // Check if we found the content
-      if (!current?.memoizedProps?.content) {
-          console.debug('Could not find markdown content in Memo');
-          return null;
-      }
+    // The thinking chain should be in a child component
+    // Let's try to find it by looking at the memoizedProps
+    function findThoughtsContent(fiber) {
+        if (!fiber) return null;
 
-      return `### ${config.thoughtsHeader}\n\n> ${current.memoizedProps.content.split('\n').join('\n> ')}`;
+        // Check if this fiber has the content we want
+        if (fiber.memoizedProps?.content) {
+            return fiber.memoizedProps.content;
+        }
+
+        // Recursively check children
+        if (fiber.child) {
+            const childResult = findThoughtsContent(fiber.child);
+            if (childResult) return childResult;
+        }
+
+        // Check siblings
+        if (fiber.sibling) {
+            const siblingResult = findThoughtsContent(fiber.sibling);
+            if (siblingResult) return siblingResult;
+        }
+
+        return null;
+    }
+
+    const content = findThoughtsContent(current);
+    if (!content) {
+        console.debug('Could not find thoughts content in React fiber tree');
+        return null;
+    }
+
+    return `### ${config.thoughtsHeader}\n\n> ${content.split('\n').join('\n> ')}`;
   }
 
   /**
@@ -166,14 +185,18 @@
           if (userMessage) {
               messages.push(`## ${config.userHeader}\n\n${userMessage}`);
           } else if (isAIMessage(node)) {
+              console.debug('Processing AI message node:', node);
               let output = '';
-              const aiReplyContainer = node.querySelector(`.${config.aiReplyContainer}`);
-              if (aiReplyContainer) {
-                  const searchHint = extractSearchOrThinking(aiReplyContainer);
+
+              // Since the AI reply container class is on the node itself, pass it directly
+              if (node.classList.contains(config.aiReplyContainer)) {
+                  console.debug('Processing AI reply container:', node);
+                  const searchHint = extractSearchOrThinking(node);
                   if (searchHint) output += `${searchHint}\n\n`;
-                  const thinkingChain = extractThinkingChain(aiReplyContainer);
+                  const thinkingChain = extractThinkingChain(node);
                   if (thinkingChain) output += `${thinkingChain}\n\n`;
               } else {
+                  console.debug('Node does not have AI reply container class');
                   const searchHint = extractSearchOrThinking(node);
                   if (searchHint) output += `${searchHint}\n\n`;
               }
