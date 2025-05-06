@@ -2,11 +2,13 @@
 
 This is a Tampermonkey/Violentmonkey script for exporting DeepSeek chat conversations in Markdown, PDF, and image formats. The script adds three export buttons to the top-right corner of the DeepSeek chat interface for quick and easy conversation saving.
 
+## English / improved version
+
 This is an English translation of <https://github.com/blueberrycongee/DeepSeek-Chat-Exporter> with several modifications:
 
-- Extract original markdown for Assistant messages from React instead of incompletely translating from HTML back to markdown.
+- Extract original markdown for Assistant messages from React instead of incompletely translating from HTML back to markdown.  Exports are more accurate and properly formatted.
 - Add a switch for whether to convert LaTeX delimiters to $$ format or not, and fix the conversion to correctly handle cases like LaTex inside lists, nested blockquotes, etc.
-- Remove `<strong>` tags in markdown output, and use User/Assistant headers instead, with reasoning tokens in a quote block, like the website.
+- Remove `<strong>` tags in markdown output, and use **User**/**Assistant** headers instead, with reasoning tokens in a quote block, like the website.
 - Make the interface less obtrusive and remove animations, etc.
 - Add chat title to exported files, and to filenames.
 - Use ISO 8601 timestamps for filenames instead of UNIX.
