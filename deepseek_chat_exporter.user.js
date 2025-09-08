@@ -22,13 +22,17 @@
   // =====================
   const config = {
       chatContainerSelector: '.dad65929', // Chat container
-      userMessageSelector: '._9663006 > .fbb737a4',  // Direct selector for user message content
+      userMessageSelector: '._9663006 .fbb737a4',  // Direct selector for user message content
       aiClassPrefix: '_4f9bf79',           // AI message related class prefix
       aiReplyContainer: '_43c05b5',        // Main container for AI replies
-      searchHintSelector: '._58a6d71._19db599', // Search/thinking time
+      searchHintSelector: '._5255ff8._4d41763', // Search/thinking time
       thinkingChainSelector: '.e1675d8b',  // Thinking chain
-      finalAnswerSelector: 'div.ds-markdown.ds-markdown--block', // Final answer
-      titleSelector: '.d8ed659a',          // Chat title selector
+      finalAnswerSelector: 'div.ds-markdown', // Final answer
+      titleSelector: '.afa34042.e37a04e4.e0a1edb7', // Chat title
+      // Fiber navigation paths discovered via __scanReact($0, prop)
+      // Update these when the site changes; they allow deterministic extraction
+      answerMarkdownPath: '$0.return.return.return', // memoizedProps.markdown
+      thinkingContentPath: '$0.child.child.child.return.return.return.return.return.return.return', // memoizedProps.content
       exportFileName: 'DeepSeek',          // Changed from DeepSeek_Chat_Export
       // Header strings used in exports
       userHeader: 'User',
@@ -82,36 +86,50 @@
       return hintNode ? `**${hintNode.textContent.trim()}**` : null;
   }
 
+
+  /**
+   * Navigate a React fiber from a DOM element using a path string
+   * Path format mirrors React DevTools output from __scanReact, e.g. "$0.return.child.sibling"
+   * Returns the fiber located at the end of the path, or null.
+   */
+  function navigateFiberPathFromElement(element, pathString) {
+      if (!element || !pathString) return null;
+      const fiberKey = Object.keys(element).find(k => k.startsWith('__reactFiber$'));
+      if (!fiberKey) return null;
+      let fiber = element[fiberKey];
+      // Normalize path: drop leading "$0." or "$0"
+      const cleaned = pathString.replace(/^\$0\.*/, '');
+      if (!cleaned) return fiber;
+      const steps = cleaned.split('.');
+      for (const step of steps) {
+          if (!step) continue;
+          fiber = fiber ? fiber[step] : null;
+          if (!fiber) return null;
+      }
+      return fiber;
+  }
+
+
   /**
    * Extracts and formats the AI's thinking chain as blockquotes
    * @param {HTMLElement} node - The DOM node containing the thinking chain
    * @returns {string|null} Markdown formatted thinking chain with header or null if not found
    */
   function extractThinkingChain(node) {
-      // Get the parent container first - this is the main AI reply container
-      const containerNode = node;  // Node is already the thinking chain container
-      if (!containerNode) {
-          console.debug('Could not find aiReplyContainer parent container');
+      // Prefer the inner ds-markdown within the thinking container as the base
+      const markdownEl = node.querySelector('div.ds-markdown');
+      const baseEl = markdownEl || node;
+
+      const navFiber = navigateFiberPathFromElement(baseEl, config.thinkingContentPath);
+      if (!navFiber || !navFiber.memoizedProps || !navFiber.memoizedProps.content) {
+          console.error('THINKING CHAIN BROKEN: Could not find memoizedProps.content at configured path');
+          console.error('Please update config.thinkingContentPath using the BREAK_FIX_GUIDE.md');
+          alert('DeepSeek Exporter Error: Thinking chain extraction broken!\nDeepSeek may have updated their website. Check console for details.');
           return null;
       }
 
-      // Get its React fiber - this connects the DOM to React's internal tree
-      const fiberKey = Object.keys(containerNode).find(key => key.startsWith('__reactFiber$'));
-      if (!fiberKey) return null;
-
-      // Navigate the React fiber tree to find the content:
-      let current = containerNode[fiberKey];                // Start at container div
-      current = current.child;                             // First child: Empty div._9ecc93a
-      current = current.sibling;                          // Sibling: Anonymous component
-      current = current.child;                            // Child: Component with content prop
-
-      // Check if we found the content
-      if (!current?.memoizedProps?.content) {
-          console.debug('Could not find markdown content in Memo');
-          return null;
-      }
-
-      return `### ${config.thoughtsHeader}\n\n> ${current.memoizedProps.content.split('\n').join('\n> ')}`;
+      const content = navFiber.memoizedProps.content;
+      return `### ${config.thoughtsHeader}\n\n> ${content.split('\n').join('\n> ')}`;
   }
 
   /**
@@ -120,31 +138,30 @@
    * @returns {string|null} Raw markdown content or null if not found
    */
   function extractFinalAnswer(node) {
-      const answerNode = node.querySelector(config.finalAnswerSelector);
+      // Choose ds-markdown that is NOT inside the thinking container
+      let answerNode = null;
+      const candidates = node.querySelectorAll('div.ds-markdown');
+      for (const el of candidates) {
+          if (!el.closest(config.thinkingChainSelector)) { answerNode = el; break; }
+      }
+      if (!answerNode) {
+          // Fallback to first ds-markdown
+          answerNode = node.querySelector(config.finalAnswerSelector);
+      }
       if (!answerNode) {
           console.debug('No answer node found');
           return null;
       }
 
-      // Get React fiber
-      const fiberKey = Object.keys(answerNode).find(key => key.startsWith('__reactFiber$'));
-      if (!fiberKey) {
-          console.error('React fiber not found');
+      const navFiber = navigateFiberPathFromElement(answerNode, config.answerMarkdownPath);
+      if (!navFiber || !navFiber.memoizedProps || !navFiber.memoizedProps.markdown) {
+          console.error('FINAL ANSWER BROKEN: Could not find memoizedProps.markdown at configured path');
+          console.error('Please update config.answerMarkdownPath using the BREAK_FIX_GUIDE.md');
+          alert('DeepSeek Exporter Error: Final answer extraction broken!\nDeepSeek may have updated their website. Check console for details.');
           return null;
       }
 
-      // Navigate directly to the markdown component (2 levels up)
-      const fiber = answerNode[fiberKey];           // Start at div
-      const level1 = fiber.return;                  // First parent
-      const markdownComponent = level1?.return;     // Second parent (has markdown)
-
-      // If any navigation step failed or the component doesn't have markdown, return null
-      if (!markdownComponent?.memoizedProps?.markdown) {
-          console.error('Could not find markdown at expected location in React tree');
-          return null;
-      }
-
-      return markdownComponent.memoizedProps.markdown;
+      return navFiber.memoizedProps.markdown;
   }
 
   /**
