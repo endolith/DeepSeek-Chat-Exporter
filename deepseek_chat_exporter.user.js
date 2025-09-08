@@ -114,6 +114,11 @@
    * Extracts and formats the AI's thinking chain as blockquotes
    * @param {HTMLElement} node - The DOM node containing the thinking chain
    * @returns {string|null} Markdown formatted thinking chain with header or null if not found
+   *
+   * CRITICAL: This function MUST extract the raw markdown from React's internal state.
+   * Converting HTML to markdown is fundamentally broken and loses formatting, LaTeX,
+   * code blocks, and other essential content. The entire purpose of this script is
+   * to get the original markdown before it's rendered to HTML.
    */
   function extractThinkingChain(node) {
       // Prefer the inner ds-markdown within the thinking container as the base
@@ -136,6 +141,11 @@
    * Extracts the final answer content from React fiber's memoizedProps
    * @param {HTMLElement} node - The DOM node containing the answer
    * @returns {string|null} Raw markdown content or null if not found
+   *
+   * CRITICAL: This function MUST extract the raw markdown from React's internal state.
+   * Converting HTML to markdown is fundamentally broken and loses formatting, LaTeX,
+   * code blocks, and other essential content. The entire purpose of this script is
+   * to get the original markdown before it's rendered to HTML.
    */
   function extractFinalAnswer(node) {
       // Choose ds-markdown that is NOT inside the thinking container
