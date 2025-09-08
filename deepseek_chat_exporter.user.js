@@ -40,6 +40,9 @@
       thoughtsHeader: 'Thought Process',
   };
 
+  // For future maintainers: see BREAK_FIX_GUIDE.md for step-by-step recovery
+  // when DOM classes or React fiber structure change.
+
   // User preferences with defaults
   const preferences = {
       convertLatexDelimiters: GM_getValue('convertLatexDelimiters', true),
