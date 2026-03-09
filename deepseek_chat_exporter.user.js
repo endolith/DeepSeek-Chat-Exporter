@@ -12,6 +12,7 @@
 // @grant        GM_registerMenuCommand
 // @license      MIT
 // @require      https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/marked/16.3.0/lib/marked.umd.min.js
 // ==/UserScript==
 
 (function () {
@@ -311,6 +312,12 @@
       const mdContent = generateMdContent();
       if (!mdContent) return;
 
+      const htmlBody = marked.parse(mdContent, { gfm: true, breaks: true })
+          .replace(new RegExp(`<h2>${config.userHeader}</h2>`, 'gi'), `<h2>${config.userHeader}</h2><div class="user-question">`)
+          .replace(new RegExp(`<h2>${config.assistantHeader}</h2>`, 'gi'), `<h2>${config.assistantHeader}</h2><div class="ai-answer">`)
+          .replace(new RegExp(`<h3>${config.thoughtsHeader}</h3>\\s*<blockquote>`, 'gi'), `<h3>${config.thoughtsHeader}</h3><blockquote class="ai-chain">`)
+          .replace(/<hr\s*\/?>/g, '</div><hr>') + '</div>';
+
       const printContent = `
           <html>
               <head>
@@ -326,18 +333,15 @@
                       .ai-chain { color: #666; font-style: italic; margin: 10px 0; padding-left: 15px; border-left: 3px solid #ddd; }
                       hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
                       blockquote { border-left: 3px solid #ddd; margin: 0 0 20px; padding-left: 15px; color: #666; font-style: italic; }
+                      pre { background: #f5f5f5; padding: 12px; overflow-x: auto; border-radius: 4px; }
+                      code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+                      pre code { padding: 0; background: none; }
+                      ul, ol { margin: 0.5em 0; padding-left: 1.5em; }
+                      a { color: #0066cc; }
                   </style>
               </head>
               <body>
-                  ${mdContent.replace(/^# \[((?:[^\]\\]|\\.)*)\]\(([^)]+)\)\n\n/, (_, text, url) => {
-                      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-                      return '<h1><a href="' + esc(url) + '">' + esc(text.replace(/\\]/g, ']')) + '</a></h1>';
-                  }).replace(new RegExp(`## ${config.userHeader}\\n\\n`, 'g'), `<h2>${config.userHeader}</h2><div class="user-question">`)
-                      .replace(new RegExp(`## ${config.assistantHeader}\\n\\n`, 'g'), `<h2>${config.assistantHeader}</h2><div class="ai-answer">`)
-                      .replace(new RegExp(`### ${config.thoughtsHeader}\\n`, 'g'), `<h3>${config.thoughtsHeader}</h3><blockquote class="ai-chain">`)
-                      .replace(/>\s/g, '') // Remove the blockquote markers for HTML
-                      .replace(/\n/g, '<br>')
-                      .replace(/---/g, '</blockquote></div><hr>')}
+                  ${htmlBody}
               </body>
           </html>
       `;
