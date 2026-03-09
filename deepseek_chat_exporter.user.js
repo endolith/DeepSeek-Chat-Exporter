@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
 // @namespace    http://tampermonkey.net/
-// @version      1.8.4
+// @version      1.8.5
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -230,7 +230,9 @@
   function generateMdContent() {
       const messages = getOrderedMessages();
       const title = getChatTitle();
-      let content = title ? `# ${title}\n\n` : '';
+      const chatUrl = window.location.href;
+      const titleForLink = title ? title.replace(/\\/g, '\\\\').replace(/]/g, '\\]') : '';
+      let content = title && chatUrl ? `# [${titleForLink}](${chatUrl})\n\n` : title ? `# ${title}\n\n` : '';
       content += messages.length ? messages.join('\n\n---\n\n') : '';
 
       // Convert LaTeX formats only if enabled
@@ -315,6 +317,9 @@
                   <title>DeepSeek Chat Export</title>
                   <style>
                       body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: 0 auto; }
+                      h1 { font-size: 1.5em; margin-top: 0; }
+                      h1 a { color: #0066cc; text-decoration: none; }
+                      h1 a:hover { text-decoration: underline; }
                       h2 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
                       h3 { color: #555; margin-top: 15px; }
                       .ai-answer { color: #1a7f37; margin: 15px 0; }
@@ -324,7 +329,10 @@
                   </style>
               </head>
               <body>
-                  ${mdContent.replace(new RegExp(`## ${config.userHeader}\\n\\n`, 'g'), `<h2>${config.userHeader}</h2><div class="user-question">`)
+                  ${mdContent.replace(/^# \[((?:[^\]\\]|\\.)*)\]\(([^)]+)\)\n\n/, (_, text, url) => {
+                      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                      return '<h1><a href="' + esc(url) + '">' + esc(text.replace(/\\]/g, ']')) + '</a></h1>';
+                  }).replace(new RegExp(`## ${config.userHeader}\\n\\n`, 'g'), `<h2>${config.userHeader}</h2><div class="user-question">`)
                       .replace(new RegExp(`## ${config.assistantHeader}\\n\\n`, 'g'), `<h2>${config.assistantHeader}</h2><div class="ai-answer">`)
                       .replace(new RegExp(`### ${config.thoughtsHeader}\\n`, 'g'), `<h3>${config.thoughtsHeader}</h3><blockquote class="ai-chain">`)
                       .replace(/>\s/g, '') // Remove the blockquote markers for HTML
