@@ -1,23 +1,30 @@
-## DeepSeek Chat Exporter – Break/Fix Guide
+# DeepSeek Chat Exporter – Break/Fix Guide
 
 Purpose: When DeepSeek updates their frontend, DOM classes and React structure can change. Use this checklist to quickly restore exports without guesswork.
 
-### 0) What you’ll need
-- Firefox + React Developer Tools extension
+## 0) Built-in diagnostic (easiest)
+
+1. On the DeepSeek chat page, click the **gear (⚙️)** on the exporter toolbar.
+2. Click **"Copy diagnostic for Cursor"**.
+3. Paste the copied text into a Cursor chat and ask the AI to update the script’s selectors and fiber paths. The diagnostic includes current config, container state, user-message probe, and instructions for React path probes.
+
+(If the export is broken, scroll to the top of the chat so the first user message is in view before copying the diagnostic.)
+
+## 1) What you’ll need (manual fix)
+
+- Firefox + React Developer Tools extension (or Chrome)
 - This repository open so you can edit `deepseek_chat_exporter.user.js`
 
-### 1) Verify DOM selectors (change only if these fail)
-- Chat container: `.dad65929`
-- User message: `._9663006 .fbb737a4`
-- Thinking container: `.e1675d8b`
-- Final answer DOM: a `div.ds-markdown` NOT inside `.e1675d8b`
+## 2) Verify DOM selectors (change only if these fail)
 
-If these are wrong, update `chatContainerSelector`, `userMessageSelector`, `thinkingChainSelector`, or the final-answer DOM filter logic accordingly.
+The script’s current selectors are in the config at the top of `deepseek_chat_exporter.user.js`. The built-in diagnostic (step 0) prints them and whether they match. If they’re wrong, update `chatContainerSelector`, `userMessageSelector`, `thinkingChainSelector`, or the final-answer DOM filter logic accordingly.
 
-### 2) Capture React paths with React DevTools (authoritative)
+## 3) Capture React paths with React DevTools (authoritative)
+
 We don’t scrape rendered HTML. We extract the raw markdown/thinking from React `memoizedProps`.
 
 Define a helper in the Console (paste once):
+
 ```javascript
 window.__scanReact = (el, prop) => {
   const fiberKey = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
@@ -43,31 +50,41 @@ window.__scanReact = (el, prop) => {
 ```
 
 Probe the two elements (right‑click → Inspect to set `$0`):
+
 - Final answer: select the answer `div.ds-markdown`, run:
+
 ```javascript
 __scanReact($0, 'markdown')
 ```
-- Thinking: select the thinking `div.ds-markdown` inside `.e1675d8b`, run:
+
+- Thinking: select the thinking `div.ds-markdown` inside the thinking container (see config `thinkingChainSelector`), run:
+
 ```javascript
 __scanReact($0, 'content')
 ```
 
 Record the returned `path` strings.
 
-### 3) Update the script config
+## 4) Update the script config
+
 Open `deepseek_chat_exporter.user.js` and set:
+
 ```js
 answerMarkdownPath: '<path from markdown probe>',
 thinkingContentPath: '<path from content probe>'
 ```
 
-Example (as of 2025‑09‑08):
+Example (paths vary when the site updates):
+
 ```js
 answerMarkdownPath: '$0.return.return.return',
-thinkingContentPath: 'current.child.child.child.return.return.return.return.return.return.return'
+thinkingContentPath: '$0.return.return.return.return'
 ```
 
-### 4) Test
+If `userMessageSelector` is a single class (e.g. `._9663006`), the script treats the container child row itself as the message when it matches; no inner `.ds-markdown` is required.
+
+## 5) Test
+
 - Export to Markdown. In the Console you should see:
   - `Found final answer at path: config.answerMarkdownPath`
   - `Found thinking content at path: config.thinkingContentPath`
@@ -75,13 +92,13 @@ thinkingContentPath: 'current.child.child.child.return.return.return.return.retu
   - `## User` with your message
   - `## Assistant` with one `### Thought Process` block and the final answer markdown
 
-### 5) If it still fails
+## 6) If it still fails
+
 - Redo the probes to confirm new paths.
 - If DOM selectors changed, update those first (step 1).
 - As a last resort, paste the two probe objects here in an issue or chat for help.
 
 Notes:
+
 - We intentionally avoid HTML→Markdown conversion. The script extracts the original markdown from React so we preserve code blocks, math, etc.
 - The code prefers the configured path; it only falls back to a limited scanner to print a path you can copy into config next time.
-
-
