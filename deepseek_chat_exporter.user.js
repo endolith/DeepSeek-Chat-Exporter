@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
 // @namespace    http://tampermonkey.net/
-// @version      1.8.5
+// @version      1.8.6
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -21,18 +21,18 @@
   // Configuration
   // =====================
   const config = {
-      chatContainerSelector: '.dad65929', // Chat container
-      userMessageSelector: '._9663006 .fbb737a4',  // Direct selector for user message content
+      chatContainerSelector: '.ds-virtual-list-visible-items', // Container holding all messages
+      userMessageSelector: '._9663006',  // User message row (content is element textContent; no inner .ds-markdown on share view)
       aiClassPrefix: '_4f9bf79',           // AI message related class prefix
       aiReplyContainer: '_43c05b5',        // Main container for AI replies
       searchHintSelector: '._5255ff8._4d41763', // Search/thinking time
-      thinkingChainSelector: '.e1675d8b',  // Thinking chain
-      finalAnswerSelector: 'div.ds-markdown', // Final answer
-      titleSelector: '.afa34042.e37a04e4.e0a1edb7', // Chat title
+      thinkingChainSelector: '._74c0879',  // Thinking chain container
+      finalAnswerSelector: '.ds-message .ds-markdown:last-child', // Final answer
+      titleSelector: '.afa34042.e37a04e4.e0a1edb7', // Chat title (update if missing)
       // Fiber navigation paths discovered via __scanReact($0, prop)
       // Update these when the site changes; they allow deterministic extraction
       answerMarkdownPath: '$0.return.return.return', // memoizedProps.markdown
-      thinkingContentPath: '$0.child.child.child.return.return.return.return.return.return.return', // memoizedProps.content
+      thinkingContentPath: '$0.return.return.return.return', // memoizedProps.content
       exportFileName: 'DeepSeek',          // Changed from DeepSeek_Chat_Export
       // Header strings used in exports
       userHeader: 'User',
@@ -61,13 +61,15 @@
   // Tool functions
   // =====================
   /**
-   * Gets the message content if the node contains a user message, null otherwise
+   * Gets the message content if the node contains a user message, null otherwise.
+   * Uses node.matches() first because querySelector only searches descendants; when the row
+   * itself is the user message element (e.g. ._9663006), the node is the content.
    * @param {HTMLElement} node - The DOM node to check
    * @returns {string|null} The user message content if found, null otherwise
    */
   function getUserMessage(node) {
-      const messageDiv = node.querySelector(config.userMessageSelector);
-      return messageDiv ? messageDiv.firstChild.textContent.trim() : null;
+      const messageDiv = node.matches(config.userMessageSelector) ? node : node.querySelector(config.userMessageSelector);
+      return messageDiv ? messageDiv.textContent.trim() : null;
   }
 
   /**
@@ -482,6 +484,7 @@
       const userMatch = document.querySelector(config.userMessageSelector);
       lines.push('## User message selector match');
       lines.push(config.userMessageSelector + ' → ' + (userMatch ? 'found (class: ' + userMatch.className + ')' : 'null'));
+      lines.push('(Script also uses node.matches(selector) so the row itself can be the content.)');
       lines.push('');
 
       const walk = (el) => {
