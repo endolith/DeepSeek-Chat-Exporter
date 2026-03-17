@@ -436,6 +436,118 @@
   }
 
   // =====================
+  // Diagnostic (for BREAK_FIX_GUIDE / Cursor chat)
+  // =====================
+  /**
+   * Collects DOM and config state into a string you can paste into Cursor chat
+   * so the AI can suggest updated selectors when the site changes.
+   */
+  function runDiagnostic() {
+      const lines = [];
+      lines.push('--- DeepSeek Chat Exporter diagnostic (paste this into Cursor chat) ---');
+      lines.push('');
+      lines.push('## Current config');
+      lines.push('```json');
+      lines.push(JSON.stringify({
+          chatContainerSelector: config.chatContainerSelector,
+          userMessageSelector: config.userMessageSelector,
+          aiClassPrefix: config.aiClassPrefix,
+          aiReplyContainer: config.aiReplyContainer,
+          searchHintSelector: config.searchHintSelector,
+          thinkingChainSelector: config.thinkingChainSelector,
+          finalAnswerSelector: config.finalAnswerSelector,
+          titleSelector: config.titleSelector,
+          answerMarkdownPath: config.answerMarkdownPath,
+          thinkingContentPath: config.thinkingContentPath,
+      }, null, 2));
+      lines.push('```');
+      lines.push('');
+
+      const container = document.querySelector(config.chatContainerSelector);
+      lines.push('## Container (.ds-virtual-list-visible-items or configured selector)');
+      if (!container) {
+          lines.push('Not found.');
+      } else {
+          lines.push('- className: ' + container.className);
+          lines.push('- childCount: ' + container.children.length);
+          const firstFew = [];
+          for (let i = 0; i < Math.min(5, container.children.length); i++) {
+              const el = container.children[i];
+              firstFew.push({ index: i, tag: el.tagName, class: el.className, textPreview: el.textContent.trim().slice(0, 60) });
+          }
+          lines.push('- firstFewChildren: ' + JSON.stringify(firstFew, null, 2));
+      }
+      lines.push('');
+
+      const userMatch = document.querySelector(config.userMessageSelector);
+      lines.push('## User message selector match');
+      lines.push(config.userMessageSelector + ' → ' + (userMatch ? 'found (class: ' + userMatch.className + ')' : 'null'));
+      lines.push('');
+
+      const walk = (el) => {
+          if (el.nodeType !== 1) return null;
+          if (el.textContent.trim() === 'hi') return el;
+          for (const c of el.children) { const f = walk(c); if (f) return f; }
+          return null;
+      };
+      const hiEl = walk(document.body);
+      lines.push('## Element with textContent "hi" (user message probe)');
+      if (hiEl) {
+          const chain = [];
+          let p = hiEl;
+          for (let i = 0; i < 6 && p; i++) {
+              p = p.parentElement;
+              if (p) chain.push(p.tagName + '.' + (p.className || '').trim().split(/\s+/).filter(Boolean).join('.'));
+          }
+          lines.push('- tag: ' + hiEl.tagName + ', class: ' + hiEl.className);
+          lines.push('- ancestor chain (tag.classNames): ' + chain.join(' <- '));
+      } else {
+          lines.push('Not found (scroll to top of chat so "hi" is in view and run again).');
+      }
+      lines.push('');
+
+      const aiBlocks = document.querySelectorAll('.' + config.aiClassPrefix);
+      lines.push('## AI message blocks');
+      lines.push('Selector ".' + config.aiClassPrefix + '" count: ' + aiBlocks.length);
+      if (aiBlocks.length) lines.push('First AI block class: ' + aiBlocks[0].className);
+      lines.push('');
+
+      if (container && container.parentElement) {
+          const p = container.parentElement;
+          lines.push('## Virtual list parent');
+          lines.push('- tag: ' + p.tagName + ', class: ' + p.className + ', childCount: ' + p.children.length);
+      }
+      lines.push('');
+
+      const markdownEls = document.querySelectorAll('.ds-markdown');
+      lines.push('## .ds-markdown elements');
+      lines.push('Count: ' + markdownEls.length);
+      const samples = [];
+      for (let i = 0; i < Math.min(5, markdownEls.length); i++) {
+          const el = markdownEls[i];
+          samples.push({ class: el.className, parentClass: el.parentElement ? el.parentElement.className : null, text: el.textContent.trim().slice(0, 50) });
+      }
+      if (samples.length) lines.push(JSON.stringify(samples, null, 2));
+      lines.push('');
+      lines.push('## React fiber paths (if extraction is broken)');
+      lines.push('In DevTools: right-click the final answer markdown block → Inspect. In console run: __scanReact($0, \'markdown\').');
+      lines.push('Then right-click the thinking markdown block (inside thinking area) → Inspect. Run: __scanReact($0, \'content\').');
+      lines.push('Paste the returned path strings so the script config can be updated.');
+      lines.push('---');
+
+      return lines.join('\n');
+  }
+
+  function copyDiagnostic() {
+      const report = runDiagnostic();
+      navigator.clipboard.writeText(report).then(() => {
+          alert('Diagnostic copied to clipboard. Paste it into Cursor chat so the AI can suggest updated selectors.');
+      }).catch(() => {
+          prompt('Copy this diagnostic and paste into Cursor chat:', report);
+      });
+  }
+
+  // =====================
   // Create Export Menu
   // =====================
   /**
@@ -463,6 +575,9 @@
               </label>
               <span>Convert to $ LaTeX Delimiters</span>
           </div>
+          <div class="ds-settings-row">
+              <button type="button" id="diagnostic-btn" style="padding:6px 10px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;">Copy diagnostic for Cursor</button>
+          </div>
       `;
 
       // Add event listeners
@@ -480,6 +595,8 @@
           preferences.convertLatexDelimiters = e.target.checked;
           GM_setValue('convertLatexDelimiters', e.target.checked);
       });
+
+      settingsPanel.querySelector("#diagnostic-btn").addEventListener("click", copyDiagnostic);
 
       // Close settings when clicking outside
       document.addEventListener("click", (e) => {
