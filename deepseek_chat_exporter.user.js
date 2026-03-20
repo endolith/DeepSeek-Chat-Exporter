@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
 // @namespace    http://tampermonkey.net/
-// @version      1.8.6
+// @version      1.8.7
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @match        https://chat.deepseek.com/*
@@ -26,7 +26,7 @@
       aiClassPrefix: '_4f9bf79',           // AI message related class prefix
       aiReplyContainer: '_43c05b5',        // Main container for AI replies
       searchHintSelector: '._5255ff8._4d41763', // Search/thinking time
-      thinkingChainSelector: '._74c0879',  // Thinking chain container
+      thinkingChainSelector: '.ds-think-content',  // Thinking chain container (stable marker class)
       finalAnswerSelector: '.ds-message .ds-markdown:last-child', // Final answer
       titleSelector: '.afa34042.e37a04e4.e0a1edb7', // Chat title (update if missing)
       // Fiber navigation paths discovered via __scanReact($0, prop)
@@ -513,6 +513,85 @@
       lines.push('## AI message blocks');
       lines.push('Selector ".' + config.aiClassPrefix + '" count: ' + aiBlocks.length);
       if (aiBlocks.length) lines.push('First AI block class: ' + aiBlocks[0].className);
+      lines.push('');
+
+      lines.push('## Thinking extraction health (first AI blocks)');
+      if (aiBlocks.length === 0) {
+          lines.push('No AI blocks found (so thinking extraction health can’t be evaluated).');
+      } else {
+          const maxToCheck = Math.min(2, aiBlocks.length);
+          for (let i = 0; i < maxToCheck; i++) {
+              const ai = aiBlocks[i];
+              const thinkingNode = ai.querySelector(config.thinkingChainSelector);
+              const thinkingNodesCount = ai.querySelectorAll(config.thinkingChainSelector).length;
+              const markdownEl = thinkingNode ? thinkingNode.querySelector('div.ds-markdown') : null;
+              const baseEl = markdownEl || thinkingNode || ai;
+              let ok = false;
+              let preview = null;
+              const navFiber = navigateFiberPathFromElement(baseEl, config.thinkingContentPath);
+              if (navFiber && navFiber.memoizedProps && typeof navFiber.memoizedProps.content === 'string') {
+                  ok = true;
+                  preview = navFiber.memoizedProps.content.slice(0, 80);
+              }
+              lines.push(
+                  [
+                      `AI[${i}]`,
+                      `thinkingChainSelector=${config.thinkingChainSelector}`,
+                      `thinkingNodeFound=${!!thinkingNode}`,
+                      `thinkingNodesInAI=${thinkingNodesCount}`,
+                      `memoizedProps.content@pathFound=${ok}`,
+                      preview ? `contentPreview="${preview.replace(/\\n/g, ' ').trim()}"` : '',
+                  ]
+                      .filter(Boolean)
+                      .join(' | ')
+              );
+          }
+      }
+      lines.push('');
+
+      lines.push('## Final answer extraction health (first AI blocks)');
+      if (aiBlocks.length === 0) {
+          lines.push('No AI blocks found (so final answer extraction health can’t be evaluated).');
+      } else {
+          const maxToCheck = Math.min(2, aiBlocks.length);
+          for (let i = 0; i < maxToCheck; i++) {
+              const ai = aiBlocks[i];
+              const dsMarkdownCount = ai.querySelectorAll('div.ds-markdown').length;
+
+              // Mirror extractFinalAnswer(): pick the first ds-markdown not inside the thinking container.
+              let answerNode = null;
+              const candidates = ai.querySelectorAll('div.ds-markdown');
+              for (const el of candidates) {
+                  if (!el.closest(config.thinkingChainSelector)) {
+                      answerNode = el;
+                      break;
+                  }
+              }
+              if (!answerNode) answerNode = ai.querySelector(config.finalAnswerSelector);
+
+              const baseEl = answerNode || ai;
+              let ok = false;
+              let preview = null;
+              const navFiber = navigateFiberPathFromElement(baseEl, config.answerMarkdownPath);
+              if (navFiber && navFiber.memoizedProps && typeof navFiber.memoizedProps.markdown === 'string') {
+                  ok = true;
+                  preview = navFiber.memoizedProps.markdown.slice(0, 80);
+              }
+
+              lines.push(
+                  [
+                      `AI[${i}]`,
+                      `finalAnswerSelector=${config.finalAnswerSelector}`,
+                      `ds-markdown count in AI=${dsMarkdownCount}`,
+                      `answerNodeFound=${!!answerNode}`,
+                      `memoizedProps.markdown@pathFound=${ok}`,
+                      preview ? `markdownPreview="${preview.replace(/\\n/g, ' ').trim()}"` : '',
+                  ]
+                      .filter(Boolean)
+                      .join(' | ')
+              );
+          }
+      }
       lines.push('');
 
       if (container && container.parentElement) {
