@@ -44,6 +44,22 @@
       thoughtsHeader: 'Thought Process',
   };
 
+  /** New issue URL when exports fail after DeepSeek changes the site (GitHub issue #7). */
+  const EXPORTER_ISSUES_NEW_URL = 'https://github.com/endolith/DeepSeek-Chat-Exporter/issues/new';
+
+  /**
+   * @param {string} [detail] - Short reason shown above the issue link
+   */
+  function alertExportFailed(detail) {
+      alert(
+          'DeepSeek Chat Exporter could not complete this export.\n\n' +
+          (detail ? String(detail).trim() + '\n\n' : '') +
+          'DeepSeek sometimes changes class names or React internals; the script may need updated selectors.\n\n' +
+          'Please file an issue with what you were doing (copy this URL if needed):\n' +
+          EXPORTER_ISSUES_NEW_URL
+      );
+  }
+
   // For future maintainers: see BREAK_FIX_GUIDE.md for step-by-step recovery
   // when DOM classes or React fiber structure change.
 
@@ -218,7 +234,7 @@
           if (!silent) {
               console.error('THINKING CHAIN BROKEN: Could not find memoizedProps.content at configured path');
               console.error('Please update config.thinkingContentPath using the BREAK_FIX_GUIDE.md');
-              alert('DeepSeek Exporter Error: Thinking chain extraction broken!\nDeepSeek may have updated their website. Check console for details.');
+              alertExportFailed('Could not read the thinking chain from the page (see console for details).');
           }
           return null;
       }
@@ -259,7 +275,7 @@
           if (!silent) {
               console.error('FINAL ANSWER BROKEN: Could not find memoizedProps.markdown at configured path');
               console.error('Please update config.answerMarkdownPath using the BREAK_FIX_GUIDE.md');
-              alert('DeepSeek Exporter Error: Final answer extraction broken!\nDeepSeek may have updated their website. Check console for details.');
+              alertExportFailed('Could not read assistant message markdown from the page (see console for details).');
           }
           return null;
       }
@@ -443,24 +459,29 @@
    * Handles math expressions and creates a downloadable .md file
    */
   function exportMarkdown() {
-      generateMdContent().then((mdContent) => {
-          if (!mdContent) {
-              alert("No chat history found!");
-              return;
-          }
+      generateMdContent()
+          .then((mdContent) => {
+              if (!mdContent) {
+                  alertExportFailed('No content was produced. Open a chat and try again.');
+                  return;
+              }
 
-          const title = getChatTitle();
-          const safeTitle = makeFilenameSafe(title, 30);
-          const titlePart = safeTitle ? `_${safeTitle}` : '';
+              const title = getChatTitle();
+              const safeTitle = makeFilenameSafe(title, 30);
+              const titlePart = safeTitle ? `_${safeTitle}` : '';
 
-          const blob = new Blob([mdContent], { type: 'text/markdown' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${config.exportFileName}${titlePart}_${getFormattedTimestamp()}.md`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
-      });
+              const blob = new Blob([mdContent], { type: 'text/markdown' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${config.exportFileName}${titlePart}_${getFormattedTimestamp()}.md`;
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 5000);
+          })
+          .catch((err) => {
+              console.error('Markdown export failed:', err);
+              alertExportFailed(err && err.message ? err.message : String(err));
+          });
   }
 
   /**
@@ -468,8 +489,12 @@
    * Creates a styled HTML version and opens the browser's print dialog
    */
   function exportPDF() {
-      generateMdContent().then((mdContent) => {
-          if (!mdContent) return;
+      generateMdContent()
+          .then((mdContent) => {
+              if (!mdContent) {
+                  alertExportFailed('No content was produced. Open a chat and try again.');
+                  return;
+              }
 
       const printContent = `
           <html>
@@ -506,7 +531,11 @@
       printWindow.document.write(printContent);
       printWindow.document.close();
       setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
-      });
+          })
+          .catch((err) => {
+              console.error('PDF export failed:', err);
+              alertExportFailed(err && err.message ? err.message : String(err));
+          });
   }
 
   /**
@@ -519,7 +548,7 @@
 
       const chatContainer = document.querySelector(config.chatContainerSelector);
       if (!chatContainer) {
-          alert("Chat container not found!");
+          alertExportFailed('Chat container not found. The page structure may have changed.');
           __exportPNGLock = false;
           return;
       }
@@ -590,7 +619,7 @@
           }, 'image/png');
       }).catch(err => {
           console.error('Screenshot failed:', err);
-          alert(`Export failed: ${err.message}`);
+          alertExportFailed(err.message || String(err));
       }).finally(() => {
           __exportPNGLock = false;
       });
