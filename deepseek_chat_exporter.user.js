@@ -302,10 +302,15 @@
               i++;
           }
       } else {
-          let scrollTop = 0;
+          // Start at the bottom and step upward so we do not jump scrollTop to 0 first; the thread
+          // appears to scroll up through the viewport until the top is reached (same row coverage as top→down).
+          let scrollTop = null;
           for (let pass = 0; pass < 2000; pass++) {
               const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
-              const pos = Math.min(scrollTop, maxScroll);
+              if (scrollTop === null) {
+                  scrollTop = maxScroll;
+              }
+              const pos = Math.max(0, Math.min(scrollTop, maxScroll));
               scrollParent.scrollTop = pos;
               await new Promise(r => requestAnimationFrame(r));
               await new Promise(r => setTimeout(r, settleMs));
@@ -316,8 +321,8 @@
                   i++;
               }
 
-              if (pos >= maxScroll) break;
-              scrollTop += step;
+              if (pos <= 0) break;
+              scrollTop = pos - step;
           }
       }
 
@@ -494,6 +499,7 @@
   /**
    * Walks scrollTop through the chat so every virtualized row mounts at least once; merges rows by
    * `tryGetMessageOrdinal` when present, otherwise by scroll position + content hash.
+   * Sweeps bottom → top so the list scrolls upward through the viewport (no initial jump to scrollTop 0).
    * @param {HTMLElement} scrollParent
    * @param {HTMLElement} chatContainer
    * @returns {Promise<string[]>}
@@ -505,10 +511,13 @@
       /** @type {Map<string, { orderKey: number, text: string }>} */
       const best = new Map();
 
-      let scrollTop = 0;
+      let scrollTop = null;
       for (let pass = 0; pass < 2000; pass++) {
           const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
-          const pos = Math.min(scrollTop, maxScroll);
+          if (scrollTop === null) {
+              scrollTop = maxScroll;
+          }
+          const pos = Math.max(0, Math.min(scrollTop, maxScroll));
           scrollParent.scrollTop = pos;
           await new Promise(r => requestAnimationFrame(r));
           await new Promise(r => setTimeout(r, settleMs));
@@ -536,8 +545,8 @@
               i++;
           }
 
-          if (pos >= maxScroll) break;
-          scrollTop += step;
+          if (pos <= 0) break;
+          scrollTop = pos - step;
       }
 
       return Array.from(best.values())
