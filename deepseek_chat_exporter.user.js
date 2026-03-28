@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
 // @namespace    https://github.com/endolith/DeepSeek-Chat-Exporter
-// @version      1.8.9
+// @version      1.9.0
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @license      MIT
@@ -210,6 +210,186 @@
           h = ((h << 5) - h + s.charCodeAt(i)) | 0;
       }
       return String(h);
+  }
+
+  /**
+   * Strip controls from a cloned message row; same idea as PNG export.
+   * @param {HTMLElement} clone
+   */
+  function stripCloneForPrintOrCapture(clone) {
+      ['button', 'input', '.ds-message-feedback-container', '.eb23581b.dfa60d66'].forEach(selector => {
+          clone.querySelectorAll(selector).forEach(el => el.remove());
+      });
+      clone.querySelectorAll('.katex-display').forEach(mathEl => {
+          mathEl.style.transform = 'none';
+          mathEl.style.position = 'relative';
+      });
+  }
+
+  /**
+   * Builds a wrapper with User / Assistant / Thought Process headings around a deep-cloned row
+   * so print uses the site-rendered DOM (markdown, math, code) instead of plain-text HTML.
+   * @param {HTMLElement} node - live row from the virtual list
+   * @returns {HTMLElement|null}
+   */
+  function buildPrintTurnWrapper(node) {
+      const clone = node.cloneNode(true);
+      stripCloneForPrintOrCapture(clone);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'ds-exporter-print-turn';
+
+      const userMessage = getUserMessage(node);
+      if (userMessage != null) {
+          const h2 = document.createElement('h2');
+          h2.className = 'ds-exporter-print-role';
+          h2.textContent = config.userHeader;
+          wrap.appendChild(h2);
+          wrap.appendChild(clone);
+          return wrap;
+      }
+
+      if (isAIMessage(node)) {
+          const h2 = document.createElement('h2');
+          h2.className = 'ds-exporter-print-role';
+          h2.textContent = config.assistantHeader;
+          wrap.appendChild(h2);
+          const think = clone.querySelector(config.thinkingChainSelector);
+          if (think) {
+              const h3 = document.createElement('h3');
+              h3.className = 'ds-exporter-print-thoughts-heading';
+              h3.textContent = config.thoughtsHeader;
+              think.parentNode.insertBefore(h3, think);
+          }
+          wrap.appendChild(clone);
+          return wrap;
+      }
+
+      return null;
+  }
+
+  /**
+   * Scrolls the virtual list and collects one decorated clone per message (same coverage as markdown export).
+   * @param {HTMLElement} chatContainer
+   * @param {HTMLElement|null} scrollParent
+   * @returns {Promise<HTMLElement[]>} wrappers in chat order
+   */
+  async function collectPrintTurnWrappers(chatContainer, scrollParent) {
+      const settleMs = 80;
+      const step = scrollParent ? Math.max(100, Math.floor(scrollParent.clientHeight * 0.3)) : 0;
+      /** @type {Map<string, { orderKey: number, el: HTMLElement }>} */
+      const best = new Map();
+
+      const considerNode = (node, pos, i) => {
+          const ord = tryGetMessageOrdinal(node);
+          if (ord != null && Number.isFinite(ord) && best.has(`o:${ord}`)) {
+              return;
+          }
+          const wrapper = buildPrintTurnWrapper(node);
+          if (!wrapper) return;
+          const orderKey = ord != null && Number.isFinite(ord) ? ord : pos * 10000 + i;
+          const dedupeKey = ord != null && Number.isFinite(ord) ? `o:${ord}` : `h:${hashString(wrapper.textContent)}`;
+          const prev = best.get(dedupeKey);
+          if (!prev || orderKey < prev.orderKey) {
+              best.set(dedupeKey, { orderKey, el: wrapper });
+          }
+      };
+
+      if (!scrollParent || scrollParent.scrollHeight <= scrollParent.clientHeight + 4) {
+          let i = 0;
+          for (const node of chatContainer.children) {
+              considerNode(node, 0, i);
+              i++;
+          }
+      } else {
+          let scrollTop = 0;
+          for (let pass = 0; pass < 2000; pass++) {
+              const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
+              const pos = Math.min(scrollTop, maxScroll);
+              scrollParent.scrollTop = pos;
+              await new Promise(r => requestAnimationFrame(r));
+              await new Promise(r => setTimeout(r, settleMs));
+
+              let i = 0;
+              for (const node of chatContainer.children) {
+                  considerNode(node, pos, i);
+                  i++;
+              }
+
+              if (pos >= maxScroll) break;
+              scrollTop += step;
+          }
+      }
+
+      return Array.from(best.values())
+          .sort((a, b) => a.orderKey - b.orderKey)
+          .map(e => e.el);
+  }
+
+  /**
+   * DeepSeek-rendered DOM + section labels; opens the system print dialog (save as PDF).
+   */
+  async function printRenderedChat() {
+      const chatContainer = document.querySelector(config.chatContainerSelector);
+      if (!chatContainer) {
+          alertExportFailed('Chat container not found. The page structure may have changed.');
+          return;
+      }
+
+      const scrollParent = findScrollParent(chatContainer);
+      const savedScroll = scrollParent ? scrollParent.scrollTop : 0;
+
+      const turns = await collectPrintTurnWrappers(chatContainer, scrollParent);
+      if (scrollParent) {
+          scrollParent.scrollTop = savedScroll;
+      }
+
+      if (!turns.length) {
+          alertExportFailed('No messages were found to print.');
+          return;
+      }
+
+      const printRoot = document.createElement('div');
+      printRoot.id = 'ds-exporter-print-root';
+
+      const title = getChatTitle();
+      const chatUrl = window.location.href;
+      if (title && chatUrl) {
+          const h1 = document.createElement('h1');
+          h1.className = 'ds-exporter-print-title';
+          const a = document.createElement('a');
+          a.href = chatUrl;
+          a.textContent = title;
+          h1.appendChild(a);
+          printRoot.appendChild(h1);
+      } else if (title) {
+          const h1 = document.createElement('h1');
+          h1.className = 'ds-exporter-print-title';
+          h1.textContent = title;
+          printRoot.appendChild(h1);
+      }
+
+      turns.forEach((turn, idx) => {
+          if (idx > 0) {
+              const hr = document.createElement('hr');
+              hr.className = 'ds-exporter-print-sep';
+              printRoot.appendChild(hr);
+          }
+          printRoot.appendChild(turn);
+      });
+
+      document.body.appendChild(printRoot);
+
+      const cleanup = () => {
+          printRoot.remove();
+          window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
+      setTimeout(cleanup, 120000);
+
+      await new Promise(r => requestAnimationFrame(r));
+      await new Promise(r => requestAnimationFrame(r));
+      window.print();
   }
 
 
@@ -493,57 +673,14 @@
   }
 
   /**
-   * Exports the chat history as a PDF
-   * Creates a styled HTML version and opens the browser's print dialog
+   * Print / Save as PDF: sweeps the virtual list (like markdown export), injects User/Assistant/Thought labels,
+   * and prints cloned live DOM so code/math match the site. Uses @media print to hide the rest of the page and our overlay.
    */
   function exportPDF() {
-      generateMdContent()
-          .then((mdContent) => {
-              if (!mdContent) {
-                  alertExportFailed('No content was produced. Open a chat and try again.');
-                  return;
-              }
-
-      const printContent = `
-          <html>
-              <head>
-                  <title>DeepSeek Chat Export</title>
-                  <style>
-                      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: 0 auto; }
-                      h1 { font-size: 1.5em; margin-top: 0; }
-                      h1 a { color: #0066cc; text-decoration: none; }
-                      h1 a:hover { text-decoration: underline; }
-                      h2 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
-                      h3 { color: #555; margin-top: 15px; }
-                      .ai-answer { color: #1a7f37; margin: 15px 0; }
-                      .ai-chain { color: #666; font-style: italic; margin: 10px 0; padding-left: 15px; border-left: 3px solid #ddd; }
-                      hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
-                      blockquote { border-left: 3px solid #ddd; margin: 0 0 20px; padding-left: 15px; color: #666; font-style: italic; }
-                  </style>
-              </head>
-              <body>
-                  ${mdContent.replace(/^# \[((?:[^\]\\]|\\.)*)\]\(([^)]+)\)\n\n/, (_, text, url) => {
-                      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-                      return '<h1><a href="' + esc(url) + '">' + esc(text.replace(/\\]/g, ']')) + '</a></h1>';
-                  }).replace(new RegExp(`## ${config.userHeader}\\n\\n`, 'g'), `<h2>${config.userHeader}</h2><div class="user-question">`)
-                      .replace(new RegExp(`## ${config.assistantHeader}\\n\\n`, 'g'), `<h2>${config.assistantHeader}</h2><div class="ai-answer">`)
-                      .replace(new RegExp(`### ${config.thoughtsHeader}\\n`, 'g'), `<h3>${config.thoughtsHeader}</h3><blockquote class="ai-chain">`)
-                      .replace(/>\s/g, '') // Remove the blockquote markers for HTML
-                      .replace(/\n/g, '<br>')
-                      .replace(/---/g, '</blockquote></div><hr>')}
-              </body>
-          </html>
-      `;
-
-      const printWindow = window.open("", "_blank");
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
-          })
-          .catch((err) => {
-              console.error('PDF export failed:', err);
-              alertExportFailed(err && err.message ? err.message : String(err));
-          });
+      printRenderedChat().catch((err) => {
+          console.error('Print failed:', err);
+          alertExportFailed(err && err.message ? err.message : String(err));
+      });
   }
 
   /**
@@ -837,7 +974,7 @@
       menu.className = "ds-exporter-menu";
       menu.innerHTML = `
           <button class="export-btn" id="md-btn" title="Export as Markdown">➡️📝</button>
-          <button class="export-btn" id="pdf-btn" title="Print to PDF">➡️🖨️</button>
+          <button class="export-btn" id="pdf-btn" title="Print / PDF (rendered chat + labels, full thread)">➡️🖨️</button>
           <button class="export-btn" id="png-btn" title="Export as Image">➡️🖼️</button>
           <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
       `;
@@ -1019,6 +1156,70 @@
 
   .settings-btn:hover {
       color: #333;
+  }
+
+  /* Screen: print buffer is not shown. Print: see @media print below. */
+  #ds-exporter-print-root {
+      display: none;
+  }
+
+  #ds-exporter-print-root .ds-exporter-print-title {
+      font-size: 1.35em;
+      margin: 0 0 1em 0;
+  }
+
+  #ds-exporter-print-root .ds-exporter-print-title a {
+      color: #0066cc;
+      text-decoration: none;
+  }
+
+  #ds-exporter-print-root .ds-exporter-print-role {
+      font-size: 1.1em;
+      color: #2c3e50;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 0.2em;
+      margin: 0.75em 0 0.5em 0;
+  }
+
+  #ds-exporter-print-root .ds-exporter-print-thoughts-heading {
+      font-size: 1em;
+      color: #555;
+      margin: 0.75em 0 0.35em 0;
+  }
+
+  #ds-exporter-print-root .ds-exporter-print-sep {
+      border: 0;
+      border-top: 1px solid #ddd;
+      margin: 1.25em 0;
+  }
+
+  @media print {
+      body * {
+          visibility: hidden !important;
+      }
+      #ds-exporter-print-root,
+      #ds-exporter-print-root * {
+          visibility: visible !important;
+      }
+      #ds-exporter-print-root {
+          display: block !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          padding: 12px 16px !important;
+          box-sizing: border-box !important;
+          background: #fff !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+      }
+      .ds-exporter-menu,
+      .ds-settings-panel {
+          display: none !important;
+          visibility: hidden !important;
+      }
   }
 `);
 
