@@ -319,6 +319,8 @@
    * @returns {Promise<string[]>}
    */
   async function collectMessagesAcrossVirtualList(scrollParent, chatContainer) {
+      // Tuned on chat.deepseek.com: virtual rows need a tick to mount after scrollTop changes.
+      const settleMs = 80;
       const step = Math.max(100, Math.floor(scrollParent.clientHeight * 0.3));
       /** @type {Map<string, { orderKey: number, text: string }>} */
       const best = new Map();
@@ -329,16 +331,22 @@
           const pos = Math.min(scrollTop, maxScroll);
           scrollParent.scrollTop = pos;
           await new Promise(r => requestAnimationFrame(r));
-          await new Promise(r => setTimeout(r, 120));
+          await new Promise(r => setTimeout(r, settleMs));
 
           let i = 0;
           for (const node of chatContainer.children) {
+              const ord = tryGetMessageOrdinal(node);
+              // Rows reappear across many scroll steps; skip fiber extraction once we have this ordinal.
+              if (ord != null && Number.isFinite(ord) && best.has(`o:${ord}`)) {
+                  i++;
+                  continue;
+              }
+
               const text = formatSingleMessageRow(node, { silent: true });
               if (!text) {
                   i++;
                   continue;
               }
-              const ord = tryGetMessageOrdinal(node);
               const orderKey = ord != null && Number.isFinite(ord) ? ord : pos * 10000 + i;
               const dedupeKey = ord != null && Number.isFinite(ord) ? `o:${ord}` : `h:${hashString(text)}`;
               const prev = best.get(dedupeKey);
