@@ -4,6 +4,10 @@
 // @version      1.8.7
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
+// @homepageURL  https://github.com/endolith/DeepSeek-Chat-Exporter
+// @supportURL   https://github.com/endolith/DeepSeek-Chat-Exporter/issues
+// @downloadURL  https://github.com/endolith/DeepSeek-Chat-Exporter/raw/refs/heads/main/deepseek_chat_exporter.user.js
+// @updateURL    https://github.com/endolith/DeepSeek-Chat-Exporter/raw/refs/heads/main/deepseek_chat_exporter.user.js
 // @match        https://chat.deepseek.com/*
 // @grant        GM_addStyle
 // @grant        GM_download
