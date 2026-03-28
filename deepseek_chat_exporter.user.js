@@ -139,10 +139,68 @@
       return markdown;
   }
 
+  /**
+   * DeepSeek keeps only visible rows under `.ds-virtual-list-visible-items`; off-screen turns are
+   * unmounted. Find the scrollable ancestor that drives that list so we can sweep scrollTop.
+   * @param {HTMLElement} el
+   * @returns {HTMLElement|null}
+   */
+  function findScrollParent(el) {
+      let p = el;
+      for (let i = 0; i < 30 && p; i++) {
+          const st = window.getComputedStyle(p);
+          const oy = st.overflowY;
+          if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && p.scrollHeight > p.clientHeight + 2) {
+              return p;
+          }
+          p = p.parentElement;
+      }
+      return null;
+  }
+
+  /**
+   * Prefer a stable per-message index from the row or React ancestors (virtual list item index).
+   * @param {HTMLElement} node
+   * @returns {number|null}
+   */
+  function tryGetMessageOrdinal(node) {
+      if (!node || node.nodeType !== 1) return null;
+      const dataIdx = node.getAttribute('data-index');
+      if (dataIdx != null && dataIdx !== '' && /^\d+$/.test(dataIdx)) return parseInt(dataIdx, 10);
+      const withData = node.querySelector('[data-index]');
+      if (withData) {
+          const v = withData.getAttribute('data-index');
+          if (v != null && /^\d+$/.test(v)) return parseInt(v, 10);
+      }
+      const fiberKey = Object.keys(node).find(k => k.startsWith('__reactFiber$'));
+      if (!fiberKey) return null;
+      let fiber = node[fiberKey];
+      for (let depth = 0; depth < 80 && fiber; depth++) {
+          const mp = fiber.memoizedProps;
+          if (mp && typeof mp === 'object') {
+              for (const k of ['index', 'messageIndex', 'msgIndex', 'order']) {
+                  const v = mp[k];
+                  if (typeof v === 'number' && Number.isFinite(v)) return v;
+              }
+          }
+          fiber = fiber.return;
+      }
+      return null;
+  }
+
+  function hashString(s) {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) {
+          h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+      }
+      return String(h);
+  }
+
 
   /**
    * Extracts and formats the AI's thinking chain as blockquotes
    * @param {HTMLElement} node - The DOM node containing the thinking chain
+   * @param {boolean} [silent] - If true, do not alert on extraction failure (used while scrolling the virtual list)
    * @returns {string|null} Markdown formatted thinking chain with header or null if not found
    *
    * CRITICAL: This function MUST extract the raw markdown from React's internal state.
@@ -150,16 +208,18 @@
    * code blocks, and other essential content. The entire purpose of this script is
    * to get the original markdown before it's rendered to HTML.
    */
-  function extractThinkingChain(node) {
+  function extractThinkingChain(node, silent) {
       // Prefer the inner ds-markdown within the thinking container as the base
       const markdownEl = node.querySelector('div.ds-markdown');
       const baseEl = markdownEl || node;
 
       const navFiber = navigateFiberPathFromElement(baseEl, config.thinkingContentPath);
       if (!navFiber || !navFiber.memoizedProps || !navFiber.memoizedProps.content) {
-          console.error('THINKING CHAIN BROKEN: Could not find memoizedProps.content at configured path');
-          console.error('Please update config.thinkingContentPath using the BREAK_FIX_GUIDE.md');
-          alert('DeepSeek Exporter Error: Thinking chain extraction broken!\nDeepSeek may have updated their website. Check console for details.');
+          if (!silent) {
+              console.error('THINKING CHAIN BROKEN: Could not find memoizedProps.content at configured path');
+              console.error('Please update config.thinkingContentPath using the BREAK_FIX_GUIDE.md');
+              alert('DeepSeek Exporter Error: Thinking chain extraction broken!\nDeepSeek may have updated their website. Check console for details.');
+          }
           return null;
       }
 
@@ -170,6 +230,7 @@
   /**
    * Extracts the final answer content from React fiber's memoizedProps
    * @param {HTMLElement} node - The DOM node containing the answer
+   * @param {boolean} [silent] - If true, do not alert on extraction failure (used while scrolling the virtual list)
    * @returns {string|null} Raw markdown content or null if not found
    *
    * CRITICAL: This function MUST extract the raw markdown from React's internal state.
@@ -177,7 +238,7 @@
    * code blocks, and other essential content. The entire purpose of this script is
    * to get the original markdown before it's rendered to HTML.
    */
-  function extractFinalAnswer(node) {
+  function extractFinalAnswer(node, silent) {
       // Choose ds-markdown that is NOT inside the thinking container
       let answerNode = null;
       const candidates = node.querySelectorAll('div.ds-markdown');
@@ -195,9 +256,11 @@
 
       const navFiber = navigateFiberPathFromElement(answerNode, config.answerMarkdownPath);
       if (!navFiber || !navFiber.memoizedProps || !navFiber.memoizedProps.markdown) {
-          console.error('FINAL ANSWER BROKEN: Could not find memoizedProps.markdown at configured path');
-          console.error('Please update config.answerMarkdownPath using the BREAK_FIX_GUIDE.md');
-          alert('DeepSeek Exporter Error: Final answer extraction broken!\nDeepSeek may have updated their website. Check console for details.');
+          if (!silent) {
+              console.error('FINAL ANSWER BROKEN: Could not find memoizedProps.markdown at configured path');
+              console.error('Please update config.answerMarkdownPath using the BREAK_FIX_GUIDE.md');
+              alert('DeepSeek Exporter Error: Final answer extraction broken!\nDeepSeek may have updated their website. Check console for details.');
+          }
           return null;
       }
 
@@ -205,40 +268,109 @@
   }
 
   /**
-   * Collects and formats all messages in the chat in chronological order
-   * @returns {string[]} Array of markdown formatted messages
+   * @param {HTMLElement} node
+   * @param {{ silent?: boolean }} [options]
+   * @returns {string|null}
    */
-  function getOrderedMessages() {
-      const messages = [];
+  function formatSingleMessageRow(node, options) {
+      const silent = options && options.silent;
+      const userMessage = getUserMessage(node);
+      if (userMessage) {
+          return `## ${config.userHeader}\n\n${userMessage}`;
+      }
+      if (!isAIMessage(node)) return null;
+      let output = '';
+      const searchHint = extractSearchOrThinking(node);
+      if (searchHint) output += `${searchHint}\n\n`;
+
+      const thinkingChainNode = node.querySelector(config.thinkingChainSelector);
+      if (thinkingChainNode) {
+          const thinkingChain = extractThinkingChain(thinkingChainNode, silent);
+          if (thinkingChain) output += `${thinkingChain}\n\n`;
+      }
+
+      const finalAnswer = extractFinalAnswer(node, silent);
+      if (finalAnswer) output += `${finalAnswer}\n\n`;
+      if (!output.trim()) return null;
+      return `## ${config.assistantHeader}\n\n${output.trim()}`;
+  }
+
+  /**
+   * Walks scrollTop through the chat so every virtualized row mounts at least once; merges rows by
+   * `tryGetMessageOrdinal` when present, otherwise by scroll position + content hash.
+   * @param {HTMLElement} scrollParent
+   * @param {HTMLElement} chatContainer
+   * @returns {Promise<string[]>}
+   */
+  async function collectMessagesAcrossVirtualList(scrollParent, chatContainer) {
+      const step = Math.max(100, Math.floor(scrollParent.clientHeight * 0.3));
+      /** @type {Map<string, { orderKey: number, text: string }>} */
+      const best = new Map();
+
+      let scrollTop = 0;
+      for (let pass = 0; pass < 2000; pass++) {
+          const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
+          const pos = Math.min(scrollTop, maxScroll);
+          scrollParent.scrollTop = pos;
+          await new Promise(r => requestAnimationFrame(r));
+          await new Promise(r => setTimeout(r, 120));
+
+          let i = 0;
+          for (const node of chatContainer.children) {
+              const text = formatSingleMessageRow(node, { silent: true });
+              if (!text) {
+                  i++;
+                  continue;
+              }
+              const ord = tryGetMessageOrdinal(node);
+              const orderKey = ord != null && Number.isFinite(ord) ? ord : pos * 10000 + i;
+              const dedupeKey = ord != null && Number.isFinite(ord) ? `o:${ord}` : `h:${hashString(text)}`;
+              const prev = best.get(dedupeKey);
+              if (!prev || orderKey < prev.orderKey) {
+                  best.set(dedupeKey, { orderKey, text });
+              }
+              i++;
+          }
+
+          if (pos >= maxScroll) break;
+          scrollTop += step;
+      }
+
+      return Array.from(best.values())
+          .sort((a, b) => a.orderKey - b.orderKey)
+          .map(e => e.text);
+  }
+
+  /**
+   * Collects and formats all messages in the chat in chronological order.
+   * When the chat uses a virtual list, scrolls through the thread so off-screen messages are included.
+   * @returns {Promise<string[]>} Array of markdown formatted messages
+   */
+  async function getOrderedMessages() {
       const chatContainer = document.querySelector(config.chatContainerSelector);
       if (!chatContainer) {
           console.error('Chat container not found');
+          return [];
+      }
+
+      const scrollParent = findScrollParent(chatContainer);
+      const needsSweep = scrollParent && scrollParent.scrollHeight > scrollParent.clientHeight + 4;
+
+      if (!needsSweep) {
+          const messages = [];
+          for (const node of chatContainer.children) {
+              const formatted = formatSingleMessageRow(node, { silent: false });
+              if (formatted) messages.push(formatted);
+          }
           return messages;
       }
 
-      for (const node of chatContainer.children) {
-          const userMessage = getUserMessage(node);
-          if (userMessage) {
-              messages.push(`## ${config.userHeader}\n\n${userMessage}`);
-          } else if (isAIMessage(node)) {
-              let output = '';
-              const searchHint = extractSearchOrThinking(node);
-              if (searchHint) output += `${searchHint}\n\n`;
-
-              const thinkingChainNode = node.querySelector(config.thinkingChainSelector);
-              if (thinkingChainNode) {
-                  const thinkingChain = extractThinkingChain(thinkingChainNode);
-                  if (thinkingChain) output += `${thinkingChain}\n\n`;
-              }
-
-              const finalAnswer = extractFinalAnswer(node);
-              if (finalAnswer) output += `${finalAnswer}\n\n`;
-              if (output.trim()) {
-                  messages.push(`## ${config.assistantHeader}\n\n${output.trim()}`);
-              }
-          }
+      const saved = scrollParent.scrollTop;
+      try {
+          return await collectMessagesAcrossVirtualList(scrollParent, chatContainer);
+      } finally {
+          scrollParent.scrollTop = saved;
       }
-      return messages;
   }
 
   /**
@@ -252,10 +384,10 @@
 
   /**
    * Generates the complete markdown content from all messages
-   * @returns {string} Complete markdown formatted chat history
+   * @returns {Promise<string>} Complete markdown formatted chat history
    */
-  function generateMdContent() {
-      const messages = getOrderedMessages();
+  async function generateMdContent() {
+      const messages = await getOrderedMessages();
       const title = getChatTitle();
       const chatUrl = window.location.href;
       const titleForLink = title ? title.replace(/\\/g, '\\\\').replace(/]/g, '\\]') : '';
@@ -311,23 +443,24 @@
    * Handles math expressions and creates a downloadable .md file
    */
   function exportMarkdown() {
-      const mdContent = generateMdContent();
-      if (!mdContent) {
-          alert("No chat history found!");
-          return;
-      }
+      generateMdContent().then((mdContent) => {
+          if (!mdContent) {
+              alert("No chat history found!");
+              return;
+          }
 
-      const title = getChatTitle();
-      const safeTitle = makeFilenameSafe(title, 30);
-      const titlePart = safeTitle ? `_${safeTitle}` : '';
+          const title = getChatTitle();
+          const safeTitle = makeFilenameSafe(title, 30);
+          const titlePart = safeTitle ? `_${safeTitle}` : '';
 
-      const blob = new Blob([mdContent], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${config.exportFileName}${titlePart}_${getFormattedTimestamp()}.md`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+          const blob = new Blob([mdContent], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${config.exportFileName}${titlePart}_${getFormattedTimestamp()}.md`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+      });
   }
 
   /**
@@ -335,8 +468,8 @@
    * Creates a styled HTML version and opens the browser's print dialog
    */
   function exportPDF() {
-      const mdContent = generateMdContent();
-      if (!mdContent) return;
+      generateMdContent().then((mdContent) => {
+          if (!mdContent) return;
 
       const printContent = `
           <html>
@@ -373,6 +506,7 @@
       printWindow.document.write(printContent);
       printWindow.document.close();
       setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+      });
   }
 
   /**
