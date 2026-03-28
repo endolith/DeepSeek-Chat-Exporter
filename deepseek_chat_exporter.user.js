@@ -1,20 +1,20 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
-// @namespace    http://tampermonkey.net/
-// @version      1.8.7
+// @namespace    https://github.com/endolith/DeepSeek-Chat-Exporter
+// @version      1.8.8
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
+// @license      MIT
 // @homepageURL  https://github.com/endolith/DeepSeek-Chat-Exporter
 // @supportURL   https://github.com/endolith/DeepSeek-Chat-Exporter/issues
-// @downloadURL  https://github.com/endolith/DeepSeek-Chat-Exporter/raw/refs/heads/main/deepseek_chat_exporter.user.js
-// @updateURL    https://github.com/endolith/DeepSeek-Chat-Exporter/raw/refs/heads/main/deepseek_chat_exporter.user.js
+// @downloadURL  https://raw.githubusercontent.com/endolith/DeepSeek-Chat-Exporter/main/deepseek_chat_exporter.user.js
+// @updateURL    https://raw.githubusercontent.com/endolith/DeepSeek-Chat-Exporter/main/deepseek_chat_exporter.user.js
 // @match        https://chat.deepseek.com/*
 // @grant        GM_addStyle
 // @grant        GM_download
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
-// @license      MIT
 // @require      https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
 // ==/UserScript==
 
