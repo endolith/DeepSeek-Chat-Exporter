@@ -65,7 +65,7 @@
 
   // User preferences with defaults
   const preferences = {
-      convertLatexDelimiters: GM_getValue('convertLatexDelimiters', true),
+      convertLatexDelimiters: GM_getValue('convertLatexDelimiters', false),
   };
 
   // Register menu command for toggling LaTeX delimiter conversion
