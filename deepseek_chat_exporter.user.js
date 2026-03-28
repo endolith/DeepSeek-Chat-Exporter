@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek Chat Exporter (Markdown & PDF & PNG - English improved version)
 // @namespace    https://github.com/endolith/DeepSeek-Chat-Exporter
-// @version      1.8.8
+// @version      1.8.9
 // @description  Export DeepSeek chat history to Markdown, PDF and PNG formats
 // @author       HSyuf/Blueberrycongee/endolith
 // @license      MIT
@@ -118,6 +118,27 @@
       return fiber;
   }
 
+  /**
+   * When the user stops generation mid-stream, React still stores partial markdown with an
+   * odd number of ``` fence lines, so the last fenced code block never closes. That breaks
+   * downstream Markdown/renderers (GitHub issue #8). Append a closing fence when needed.
+   * @param {string} markdown
+   * @returns {string}
+   */
+  function closeUnclosedFencedCodeBlocks(markdown) {
+      if (typeof markdown !== 'string' || markdown.length === 0) return markdown;
+      const lines = markdown.split(/\r?\n/);
+      let inThreeBacktickFence = false;
+      for (const line of lines) {
+          // CommonMark: up to 3 spaces indent, then a code fence run (we only normalize ```).
+          const m = line.match(/^ {0,3}(```+)/);
+          if (!m) continue;
+          if (m[1].length === 3) inThreeBacktickFence = !inThreeBacktickFence;
+      }
+      if (inThreeBacktickFence) return markdown + '\n```';
+      return markdown;
+  }
+
 
   /**
    * Extracts and formats the AI's thinking chain as blockquotes
@@ -142,7 +163,7 @@
           return null;
       }
 
-      const content = navFiber.memoizedProps.content;
+      const content = closeUnclosedFencedCodeBlocks(navFiber.memoizedProps.content);
       return `### ${config.thoughtsHeader}\n\n> ${content.split('\n').join('\n> ')}`;
   }
 
@@ -180,7 +201,7 @@
           return null;
       }
 
-      return navFiber.memoizedProps.markdown;
+      return closeUnclosedFencedCodeBlocks(navFiber.memoizedProps.markdown);
   }
 
   /**
