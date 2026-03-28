@@ -212,6 +212,25 @@
       return String(h);
   }
 
+  function showVirtualListSweepNotice() {
+      let el = document.getElementById('ds-exporter-sweep-notice');
+      if (!el) {
+          el = document.createElement('div');
+          el.id = 'ds-exporter-sweep-notice';
+          el.className = 'ds-exporter-sweep-notice';
+          el.setAttribute('role', 'status');
+          el.setAttribute('aria-live', 'polite');
+          document.body.appendChild(el);
+      }
+      el.textContent = 'Loading entire conversation for export…';
+      el.classList.add('ds-exporter-sweep-notice--visible');
+  }
+
+  function hideVirtualListSweepNotice() {
+      const el = document.getElementById('ds-exporter-sweep-notice');
+      if (el) el.classList.remove('ds-exporter-sweep-notice--visible');
+  }
+
   /**
    * Strip controls from a cloned message row; same idea as PNG export.
    * @param {HTMLElement} clone
@@ -304,25 +323,30 @@
       } else {
           // Start at the bottom and step upward so we do not jump scrollTop to 0 first; the thread
           // appears to scroll up through the viewport until the top is reached (same row coverage as top→down).
-          let scrollTop = null;
-          for (let pass = 0; pass < 2000; pass++) {
-              const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
-              if (scrollTop === null) {
-                  scrollTop = maxScroll;
-              }
-              const pos = Math.max(0, Math.min(scrollTop, maxScroll));
-              scrollParent.scrollTop = pos;
-              await new Promise(r => requestAnimationFrame(r));
-              await new Promise(r => setTimeout(r, settleMs));
+          showVirtualListSweepNotice();
+          try {
+              let scrollTop = null;
+              for (let pass = 0; pass < 2000; pass++) {
+                  const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
+                  if (scrollTop === null) {
+                      scrollTop = maxScroll;
+                  }
+                  const pos = Math.max(0, Math.min(scrollTop, maxScroll));
+                  scrollParent.scrollTop = pos;
+                  await new Promise(r => requestAnimationFrame(r));
+                  await new Promise(r => setTimeout(r, settleMs));
 
-              let i = 0;
-              for (const node of chatContainer.children) {
-                  considerNode(node, pos, i);
-                  i++;
-              }
+                  let i = 0;
+                  for (const node of chatContainer.children) {
+                      considerNode(node, pos, i);
+                      i++;
+                  }
 
-              if (pos <= 0) break;
-              scrollTop = pos - step;
+                  if (pos <= 0) break;
+                  scrollTop = pos - step;
+              }
+          } finally {
+              hideVirtualListSweepNotice();
           }
       }
 
@@ -511,47 +535,52 @@
       /** @type {Map<string, { orderKey: number, text: string }>} */
       const best = new Map();
 
-      let scrollTop = null;
-      for (let pass = 0; pass < 2000; pass++) {
-          const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
-          if (scrollTop === null) {
-              scrollTop = maxScroll;
-          }
-          const pos = Math.max(0, Math.min(scrollTop, maxScroll));
-          scrollParent.scrollTop = pos;
-          await new Promise(r => requestAnimationFrame(r));
-          await new Promise(r => setTimeout(r, settleMs));
+      showVirtualListSweepNotice();
+      try {
+          let scrollTop = null;
+          for (let pass = 0; pass < 2000; pass++) {
+              const maxScroll = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
+              if (scrollTop === null) {
+                  scrollTop = maxScroll;
+              }
+              const pos = Math.max(0, Math.min(scrollTop, maxScroll));
+              scrollParent.scrollTop = pos;
+              await new Promise(r => requestAnimationFrame(r));
+              await new Promise(r => setTimeout(r, settleMs));
 
-          let i = 0;
-          for (const node of chatContainer.children) {
-              const ord = tryGetMessageOrdinal(node);
-              // Rows reappear across many scroll steps; skip fiber extraction once we have this ordinal.
-              if (ord != null && Number.isFinite(ord) && best.has(`o:${ord}`)) {
+              let i = 0;
+              for (const node of chatContainer.children) {
+                  const ord = tryGetMessageOrdinal(node);
+                  // Rows reappear across many scroll steps; skip fiber extraction once we have this ordinal.
+                  if (ord != null && Number.isFinite(ord) && best.has(`o:${ord}`)) {
+                      i++;
+                      continue;
+                  }
+
+                  const text = formatSingleMessageRow(node, { silent: true });
+                  if (!text) {
+                      i++;
+                      continue;
+                  }
+                  const orderKey = ord != null && Number.isFinite(ord) ? ord : pos * 10000 + i;
+                  const dedupeKey = ord != null && Number.isFinite(ord) ? `o:${ord}` : `h:${hashString(text)}`;
+                  const prev = best.get(dedupeKey);
+                  if (!prev || orderKey < prev.orderKey) {
+                      best.set(dedupeKey, { orderKey, text });
+                  }
                   i++;
-                  continue;
               }
 
-              const text = formatSingleMessageRow(node, { silent: true });
-              if (!text) {
-                  i++;
-                  continue;
-              }
-              const orderKey = ord != null && Number.isFinite(ord) ? ord : pos * 10000 + i;
-              const dedupeKey = ord != null && Number.isFinite(ord) ? `o:${ord}` : `h:${hashString(text)}`;
-              const prev = best.get(dedupeKey);
-              if (!prev || orderKey < prev.orderKey) {
-                  best.set(dedupeKey, { orderKey, text });
-              }
-              i++;
+              if (pos <= 0) break;
+              scrollTop = pos - step;
           }
 
-          if (pos <= 0) break;
-          scrollTop = pos - step;
+          return Array.from(best.values())
+              .sort((a, b) => a.orderKey - b.orderKey)
+              .map(e => e.text);
+      } finally {
+          hideVirtualListSweepNotice();
       }
-
-      return Array.from(best.values())
-          .sort((a, b) => a.orderKey - b.orderKey)
-          .map(e => e.text);
   }
 
   /**
@@ -1229,6 +1258,36 @@
           display: none !important;
           visibility: hidden !important;
       }
+      #ds-exporter-sweep-notice {
+          display: none !important;
+          visibility: hidden !important;
+      }
+  }
+
+  .ds-exporter-sweep-notice {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000000;
+      max-width: min(640px, 90vw);
+      padding: 28px 36px;
+      background: rgba(33, 37, 41, 0.94);
+      color: #f8f9fa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 20px;
+      line-height: 1.45;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      pointer-events: none;
+  }
+
+  .ds-exporter-sweep-notice.ds-exporter-sweep-notice--visible {
+      display: flex;
   }
 `);
 
