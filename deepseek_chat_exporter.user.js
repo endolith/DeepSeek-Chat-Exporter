@@ -47,17 +47,98 @@
   /** New issue URL when exports fail after DeepSeek changes the site (GitHub issue #7). */
   const EXPORTER_ISSUES_NEW_URL = 'https://github.com/endolith/DeepSeek-Chat-Exporter/issues/new';
 
+  let __exportFailedNoticeEscapeHandler = null;
+
+  function hideExportFailedNotice() {
+      const el = document.getElementById('ds-exporter-error-notice');
+      if (el) {
+          el.classList.remove('ds-exporter-error-notice--visible');
+      }
+      if (__exportFailedNoticeEscapeHandler) {
+          document.removeEventListener('keydown', __exportFailedNoticeEscapeHandler);
+          __exportFailedNoticeEscapeHandler = null;
+      }
+  }
+
   /**
+   * In-page failure UI (same visual family as the sweep notice) so the issue URL is a real link.
    * @param {string} [detail] - Short reason shown above the issue link
    */
   function alertExportFailed(detail) {
-      alert(
-          'DeepSeek Chat Exporter could not complete this export.\n\n' +
-          (detail ? String(detail).trim() + '\n\n' : '') +
-          'DeepSeek sometimes changes class names or React internals; the script may need updated selectors.\n\n' +
-          'Please file an issue with what you were doing (copy this URL if needed):\n' +
-          EXPORTER_ISSUES_NEW_URL
-      );
+      let root = document.getElementById('ds-exporter-error-notice');
+      if (!root) {
+          root = document.createElement('div');
+          root.id = 'ds-exporter-error-notice';
+          root.className = 'ds-exporter-error-notice';
+          root.setAttribute('role', 'alertdialog');
+          root.setAttribute('aria-modal', 'true');
+          root.setAttribute('aria-labelledby', 'ds-exporter-error-heading');
+          root.addEventListener('click', (ev) => {
+              if (ev.target === root) {
+                  hideExportFailedNotice();
+              }
+          });
+          document.body.appendChild(root);
+      }
+      root.replaceChildren();
+
+      const box = document.createElement('div');
+      box.className = 'ds-exporter-notice-panel ds-exporter-error-notice__panel';
+
+      const h2 = document.createElement('h2');
+      h2.id = 'ds-exporter-error-heading';
+      h2.className = 'ds-exporter-error-notice__title';
+      h2.textContent = 'DeepSeek Chat Exporter could not complete this export.';
+      box.appendChild(h2);
+
+      const d = detail != null ? String(detail).trim() : '';
+      if (d) {
+          const pDetail = document.createElement('p');
+          pDetail.className = 'ds-exporter-error-notice__detail';
+          pDetail.textContent = d;
+          box.appendChild(pDetail);
+      }
+
+      const pHint = document.createElement('p');
+      pHint.className = 'ds-exporter-error-notice__hint';
+      pHint.textContent =
+          'DeepSeek sometimes changes class names or React internals; the script may need updated selectors.';
+      box.appendChild(pHint);
+
+      const pLink = document.createElement('p');
+      pLink.className = 'ds-exporter-error-notice__linkline';
+      const a = document.createElement('a');
+      a.href = EXPORTER_ISSUES_NEW_URL;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = 'File an issue on GitHub';
+      pLink.appendChild(a);
+      pLink.appendChild(document.createTextNode(' (opens in a new tab)'));
+      box.appendChild(pLink);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ds-exporter-error-notice__dismiss';
+      btn.textContent = 'OK';
+      btn.addEventListener('click', hideExportFailedNotice);
+      box.appendChild(btn);
+
+      root.appendChild(box);
+
+      if (__exportFailedNoticeEscapeHandler) {
+          document.removeEventListener('keydown', __exportFailedNoticeEscapeHandler);
+      }
+      __exportFailedNoticeEscapeHandler = (ev) => {
+          if (ev.key === 'Escape') {
+              hideExportFailedNotice();
+          }
+      };
+      document.addEventListener('keydown', __exportFailedNoticeEscapeHandler);
+
+      root.classList.add('ds-exporter-error-notice--visible');
+      requestAnimationFrame(() => {
+          btn.focus();
+      });
   }
 
   // For future maintainers: see BREAK_FIX_GUIDE.md for step-by-step recovery
@@ -217,11 +298,12 @@
       if (!el) {
           el = document.createElement('div');
           el.id = 'ds-exporter-sweep-notice';
-          el.className = 'ds-exporter-sweep-notice';
+          el.className = 'ds-exporter-sweep-notice ds-exporter-notice-panel';
           el.setAttribute('role', 'status');
           el.setAttribute('aria-live', 'polite');
           document.body.appendChild(el);
       }
+      el.className = 'ds-exporter-sweep-notice ds-exporter-notice-panel';
       el.textContent = 'Loading entire conversation for export…';
       el.classList.add('ds-exporter-sweep-notice--visible');
   }
@@ -1366,10 +1448,23 @@
           display: none !important;
           visibility: hidden !important;
       }
-      #ds-exporter-sweep-notice {
+      #ds-exporter-sweep-notice,
+      #ds-exporter-error-notice {
           display: none !important;
           visibility: hidden !important;
       }
+  }
+
+  /* Shared dark card with the “loading entire conversation” toast (sweep uses it alone; error nests it). */
+  .ds-exporter-notice-panel {
+      max-width: min(640px, 90vw);
+      padding: 28px 36px;
+      background: rgba(33, 37, 41, 0.94);
+      color: #f8f9fa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.45;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
   }
 
   .ds-exporter-sweep-notice {
@@ -1378,15 +1473,7 @@
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 1000000;
-      max-width: min(640px, 90vw);
-      padding: 28px 36px;
-      background: rgba(33, 37, 41, 0.94);
-      color: #f8f9fa;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 20px;
-      line-height: 1.45;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
       display: none;
       align-items: center;
       justify-content: center;
@@ -1396,6 +1483,89 @@
 
   .ds-exporter-sweep-notice.ds-exporter-sweep-notice--visible {
       display: flex;
+  }
+
+  .ds-exporter-error-notice {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000001;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.45);
+      pointer-events: auto;
+  }
+
+  .ds-exporter-error-notice.ds-exporter-error-notice--visible {
+      display: flex;
+  }
+
+  .ds-exporter-error-notice__panel {
+      text-align: left;
+      font-size: 16px;
+      line-height: 1.5;
+      max-height: min(90vh, 100%);
+      overflow: auto;
+  }
+
+  .ds-exporter-error-notice__title {
+      margin: 0 0 14px 0;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.35;
+  }
+
+  .ds-exporter-error-notice__detail {
+      margin: 0 0 12px 0;
+      font-size: 15px;
+      color: #ffc9a8;
+  }
+
+  .ds-exporter-error-notice__hint {
+      margin: 0 0 14px 0;
+      font-size: 14px;
+      color: #ced4da;
+  }
+
+  .ds-exporter-error-notice__linkline {
+      margin: 0 0 20px 0;
+      font-size: 15px;
+  }
+
+  .ds-exporter-error-notice__linkline a {
+      color: #7ec8ff;
+      text-decoration: underline;
+  }
+
+  .ds-exporter-error-notice__linkline a:hover {
+      color: #b8ddff;
+  }
+
+  .ds-exporter-error-notice__dismiss {
+      display: block;
+      margin-left: auto;
+      padding: 8px 22px;
+      font-size: 15px;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background: #e8c9a0;
+      color: #1a1208;
+      font-weight: 600;
+  }
+
+  .ds-exporter-error-notice__dismiss:hover {
+      background: #f0d4b0;
+  }
+
+  .ds-exporter-error-notice__dismiss:focus-visible {
+      outline: 2px solid #7ec8ff;
+      outline-offset: 2px;
   }
 `);
 
