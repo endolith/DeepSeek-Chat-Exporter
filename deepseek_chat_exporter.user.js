@@ -232,17 +232,88 @@
   }
 
   /**
-   * Strip controls from a cloned message row; same idea as PNG export.
+   * Strip controls from a cloned message row (print + PNG). KaTeX injects a MathML copy for
+   * accessibility; html2canvas draws both, so formulas look duplicated unless .katex-mathml is removed.
    * @param {HTMLElement} clone
    */
   function stripCloneForPrintOrCapture(clone) {
-      ['button', 'input', '.ds-message-feedback-container', '.eb23581b.dfa60d66'].forEach(selector => {
+      [
+          'button',
+          'input',
+          'a[role="button"]',
+          '.ds-message-feedback-container',
+          '.eb23581b.dfa60d66',
+          '[class*="message-actions"]',
+          '[class*="MessageFeedback"]',
+          '[class*="message-feedback"]',
+          '[class*="message-footer"]',
+          '[class*="MessageFooter"]',
+          '[class*="ds-think-header"]',
+          '[class*="ThinkHeader"]',
+          '[class*="think-header"]',
+          config.searchHintSelector,
+      ].forEach(selector => {
           clone.querySelectorAll(selector).forEach(el => el.remove());
       });
+      clone.querySelectorAll('.katex-mathml').forEach(el => el.remove());
+      clone.querySelectorAll('.katex annotation').forEach(el => el.remove());
       clone.querySelectorAll('.katex-display').forEach(mathEl => {
           mathEl.style.transform = 'none';
           mathEl.style.position = 'relative';
       });
+  }
+
+  /**
+   * KaTeX draws formulas with SVG paths; html2canvas often inherits dark-theme stroke/fill, so math
+   * looks faint on a white PNG. Force visible strokes before rasterizing.
+   * @param {HTMLElement} root
+   */
+  function applyPngKatexSvgFixes(root) {
+      const ink = '#0d0d0d';
+      root.querySelectorAll('.katex svg').forEach(svg => {
+          svg.style.color = ink;
+          svg.style.fill = ink;
+          svg.style.stroke = ink;
+          svg.style.opacity = '1';
+      });
+      root.querySelectorAll('.katex svg path, .katex svg line, .katex svg rect').forEach(el => {
+          el.setAttribute('fill', ink);
+          el.setAttribute('stroke', ink);
+          el.style.fill = ink;
+          el.style.stroke = ink;
+      });
+  }
+
+  /**
+   * DeepSeek’s stylesheet keys off `data-ds-dark-theme` on `html` / `body` (see site CSS variables).
+   * PNG export clones live rows; with dark mode on, bubbles and code headers pick up dark inline styles.
+   * Temporarily clear that attribute so the app paints in light theme before we sweep and rasterize,
+   * then restore the user’s preference in `finally`.
+   * @template T
+   * @param {() => Promise<T>} fn
+   * @returns {Promise<T>}
+   */
+  async function withTemporaryLightThemeForCapture(fn) {
+      /** @type {HTMLElement[]} */
+      const hadDark = [];
+      for (const el of [document.documentElement, document.body]) {
+          if (el.hasAttribute('data-ds-dark-theme')) {
+              hadDark.push(el);
+          }
+      }
+      const stripDeepSeekDarkThemeAttr = () => {
+          document.documentElement.removeAttribute('data-ds-dark-theme');
+          document.body.removeAttribute('data-ds-dark-theme');
+      };
+      stripDeepSeekDarkThemeAttr();
+      try {
+          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+          await new Promise(r => setTimeout(r, 280));
+          stripDeepSeekDarkThemeAttr();
+          return await fn();
+      } finally {
+          hadDark.forEach(el => el.setAttribute('data-ds-dark-theme', ''));
+      }
   }
 
   /**
@@ -356,6 +427,38 @@
   }
 
   /**
+   * @param {HTMLElement} root
+   * @param {HTMLElement[]} turns
+   */
+  function appendChatTitleAndTurns(root, turns) {
+      const title = getChatTitle();
+      const chatUrl = window.location.href;
+      if (title && chatUrl) {
+          const h1 = document.createElement('h1');
+          h1.className = 'ds-exporter-print-title';
+          const a = document.createElement('a');
+          a.href = chatUrl;
+          a.textContent = title;
+          h1.appendChild(a);
+          root.appendChild(h1);
+      } else if (title) {
+          const h1 = document.createElement('h1');
+          h1.className = 'ds-exporter-print-title';
+          h1.textContent = title;
+          root.appendChild(h1);
+      }
+
+      turns.forEach((turn, idx) => {
+          if (idx > 0) {
+              const hr = document.createElement('hr');
+              hr.className = 'ds-exporter-print-sep';
+              root.appendChild(hr);
+          }
+          root.appendChild(turn);
+      });
+  }
+
+  /**
    * DeepSeek-rendered DOM + section labels; opens the system print dialog (save as PDF).
    */
   async function printRenderedChat() {
@@ -381,31 +484,7 @@
       const printRoot = document.createElement('div');
       printRoot.id = 'ds-exporter-print-root';
 
-      const title = getChatTitle();
-      const chatUrl = window.location.href;
-      if (title && chatUrl) {
-          const h1 = document.createElement('h1');
-          h1.className = 'ds-exporter-print-title';
-          const a = document.createElement('a');
-          a.href = chatUrl;
-          a.textContent = title;
-          h1.appendChild(a);
-          printRoot.appendChild(h1);
-      } else if (title) {
-          const h1 = document.createElement('h1');
-          h1.className = 'ds-exporter-print-title';
-          h1.textContent = title;
-          printRoot.appendChild(h1);
-      }
-
-      turns.forEach((turn, idx) => {
-          if (idx > 0) {
-              const hr = document.createElement('hr');
-              hr.className = 'ds-exporter-print-sep';
-              printRoot.appendChild(hr);
-          }
-          printRoot.appendChild(turn);
-      });
+      appendChatTitleAndTurns(printRoot, turns);
 
       document.body.appendChild(printRoot);
 
@@ -722,11 +801,11 @@
   }
 
   /**
-   * Exports the chat history as a PNG image
-   * Creates a high-resolution screenshot of the chat content
+   * PNG: same pipeline as print/PDF — virtual-list sweep, User/Assistant/Thought labels, rendered DOM.
+   * Built in the main document (not a blank iframe) so DeepSeek + KaTeX CSS apply; strip MathML duplicates for clean math.
    */
-  function exportPNG() {
-      if (__exportPNGLock) return;  // Skip if currently exporting
+  async function exportPNG() {
+      if (__exportPNGLock) return;
       __exportPNGLock = true;
 
       const chatContainer = document.querySelector(config.chatContainerSelector);
@@ -736,76 +815,96 @@
           return;
       }
 
-      // Create sandbox container
-      const sandbox = document.createElement('iframe');
-      sandbox.style.cssText = `
-          position: fixed;
-          left: -9999px;
-          top: 0;
-          width: 800px;
-          height: ${window.innerHeight}px;
-          border: 0;
-          visibility: hidden;
-      `;
-      document.body.appendChild(sandbox);
+      const scrollParent = findScrollParent(chatContainer);
+      const savedScroll = scrollParent ? scrollParent.scrollTop : 0;
+      let pngRoot = null;
 
-      // Deep clone and style processing
-      const cloneNode = chatContainer.cloneNode(true);
-      cloneNode.style.cssText = `
-          width: 800px !important;
-          transform: none !important;
-          overflow: visible !important;
-          position: static !important;
-          background: white !important;
-          max-height: none !important;
-          padding: 20px !important;
-          margin: 0 !important;
-          box-sizing: border-box !important;
-      `;
+      try {
+          await withTemporaryLightThemeForCapture(async () => {
+              const turns = await collectPrintTurnWrappers(chatContainer, scrollParent);
+              if (scrollParent) {
+                  scrollParent.scrollTop = savedScroll;
+              }
 
-      // Clean up interfering elements, exclude icons
-      ['button', 'input', '.ds-message-feedback-container', '.eb23581b.dfa60d66'].forEach(selector => {
-          cloneNode.querySelectorAll(selector).forEach(el => el.remove());
-      });
+              if (!turns.length) {
+                  alertExportFailed('No messages were found to export.');
+                  return;
+              }
 
-      // Math formula fix
-      cloneNode.querySelectorAll('.katex-display').forEach(mathEl => {
-          mathEl.style.transform = 'none !important';
-          mathEl.style.position = 'relative !important';
-      });
+              pngRoot = document.createElement('div');
+              pngRoot.id = 'ds-exporter-png-root';
+              appendChatTitleAndTurns(pngRoot, turns);
 
-      // Inject sandbox
-      sandbox.contentDocument.body.appendChild(cloneNode);
-      sandbox.contentDocument.body.style.background = 'white';
+              pngRoot.style.cssText = [
+                  'position:fixed',
+                  'left:-9999px',
+                  'top:0',
+                  'width:800px',
+                  'box-sizing:border-box',
+                  'background:#fff',
+                  'z-index:-1',
+                  'overflow:visible',
+                  'margin:0',
+                  'padding:20px',
+              ].join(';');
 
-      // Wait for resources to load
-      const waitReady = () => Promise.all([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 300))]);
+              document.body.appendChild(pngRoot);
 
-      waitReady().then(() => {
-          return html2canvas(cloneNode, {
-              scale: 2,
-              useCORS: true,
-              logging: true,
-              backgroundColor: "#FFFFFF"
+              applyPngKatexSvgFixes(pngRoot);
+
+              await Promise.all([document.fonts.ready, new Promise(r => setTimeout(r, 400))]);
+
+              const canvas = await html2canvas(pngRoot, {
+                  scale: 2,
+                  useCORS: true,
+                  logging: false,
+                  backgroundColor: '#ffffff',
+                  onclone(clonedDoc) {
+                      const cap = clonedDoc.getElementById('ds-exporter-png-root');
+                      if (!cap) return;
+                      cap.querySelectorAll('.katex-mathml').forEach(n => n.remove());
+                      cap.querySelectorAll('.katex annotation').forEach(n => n.remove());
+                      cap.querySelectorAll('.katex').forEach(k => {
+                          k.style.color = '#0d0d0d';
+                          k.style.setProperty('-webkit-text-fill-color', '#0d0d0d');
+                      });
+                      applyPngKatexSvgFixes(cap);
+                  },
+              });
+
+              if (pngRoot.parentNode) {
+                  pngRoot.remove();
+              }
+              pngRoot = null;
+
+              await new Promise((resolve, reject) => {
+                  canvas.toBlob(blob => {
+                      if (!blob) {
+                          reject(new Error('PNG export produced an empty image.'));
+                          return;
+                      }
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      const title = getChatTitle();
+                      const safeTitle = makeFilenameSafe(title, 30);
+                      const titlePart = safeTitle ? `_${safeTitle}` : '';
+                      a.download = `${config.exportFileName}${titlePart}_${getFormattedTimestamp()}.png`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 5000);
+                      resolve();
+                  }, 'image/png');
+              });
           });
-      }).then(canvas => {
-          canvas.toBlob(blob => {
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `${config.exportFileName}_${getFormattedTimestamp()}.png`;
-              a.click();
-              setTimeout(() => {
-                  URL.revokeObjectURL(url);
-                  sandbox.remove();
-              }, 1000);
-          }, 'image/png');
-      }).catch(err => {
-          console.error('Screenshot failed:', err);
+      } catch (err) {
+          console.error('PNG export failed:', err);
           alertExportFailed(err.message || String(err));
-      }).finally(() => {
+      } finally {
+          if (pngRoot && pngRoot.parentNode) {
+              pngRoot.remove();
+          }
           __exportPNGLock = false;
-      });
+      }
   }
 
   // =====================
@@ -834,6 +933,10 @@
           thinkingContentPath: config.thinkingContentPath,
       }, null, 2));
       lines.push('```');
+      lines.push('');
+      lines.push('## Theme (PNG export briefly clears `data-ds-dark-theme` on html/body)');
+      lines.push(`- document.documentElement: ${document.documentElement.hasAttribute('data-ds-dark-theme') ? 'has data-ds-dark-theme' : 'no data-ds-dark-theme'}`);
+      lines.push(`- document.body: ${document.body.hasAttribute('data-ds-dark-theme') ? 'has data-ds-dark-theme' : 'no data-ds-dark-theme'}`);
       lines.push('');
 
       const container = document.querySelector(config.chatContainerSelector);
@@ -1013,7 +1116,7 @@
       menu.innerHTML = `
           <button class="export-btn" id="md-btn" title="Export as Markdown">➡️📝</button>
           <button class="export-btn" id="pdf-btn" title="Print / PDF (rendered chat + labels, full thread)">➡️🖨️</button>
-          <button class="export-btn" id="png-btn" title="Export as Image">➡️🖼️</button>
+          <button class="export-btn" id="png-btn" title="Export as PNG (full thread, like print)">➡️🖼️</button>
           <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
       `;
 
@@ -1201,17 +1304,20 @@
       display: none;
   }
 
-  #ds-exporter-print-root .ds-exporter-print-title {
+  #ds-exporter-print-root .ds-exporter-print-title,
+  #ds-exporter-png-root .ds-exporter-print-title {
       font-size: 1.35em;
       margin: 0 0 1em 0;
   }
 
-  #ds-exporter-print-root .ds-exporter-print-title a {
+  #ds-exporter-print-root .ds-exporter-print-title a,
+  #ds-exporter-png-root .ds-exporter-print-title a {
       color: #0066cc;
       text-decoration: none;
   }
 
-  #ds-exporter-print-root .ds-exporter-print-role {
+  #ds-exporter-print-root .ds-exporter-print-role,
+  #ds-exporter-png-root .ds-exporter-print-role {
       font-size: 1.1em;
       color: #2c3e50;
       border-bottom: 1px solid #eee;
@@ -1219,13 +1325,15 @@
       margin: 0.75em 0 0.5em 0;
   }
 
-  #ds-exporter-print-root .ds-exporter-print-thoughts-heading {
+  #ds-exporter-print-root .ds-exporter-print-thoughts-heading,
+  #ds-exporter-png-root .ds-exporter-print-thoughts-heading {
       font-size: 1em;
       color: #555;
       margin: 0.75em 0 0.35em 0;
   }
 
-  #ds-exporter-print-root .ds-exporter-print-sep {
+  #ds-exporter-print-root .ds-exporter-print-sep,
+  #ds-exporter-png-root .ds-exporter-print-sep {
       border: 0;
       border-top: 1px solid #ddd;
       margin: 1.25em 0;
